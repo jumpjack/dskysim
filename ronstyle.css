@@ -1,0 +1,79 @@
+.welcome { 
+   font-family:Arial;
+   font-style:italic;
+   font-weight:bold;
+   font-size:20px
+}
+.intro { 
+   font-family:Arial;
+   font-style:italic;
+   font-weight:bold;
+   font-size:18px
+}
+.kop { 
+   font-family:Arial;
+   font-weight:bold;
+   font-size:36px
+}
+.kop2 { 
+   font-family:Arial;
+   font-weight:bold;
+   font-size:24px
+}
+.kopT { 
+   font-family:Times New Roman;
+   font-style:italic;
+   font-size:22px
+}
+.subkop { 
+   font-family:Arial;
+   font-size:14px;
+   font-weight:bold
+}
+.subkopI { 
+   font-family:Arial;
+   font-size:14px;
+   font-style:italic;
+   font-weight:bold
+}
+.plat { 
+   font-family:Arial;
+   font-size:12px
+}
+.label { 
+   font-family:Arial;
+   font-size:10px;
+   font-weight:bold
+}
+.platvet { 
+   font-family:Arial;
+   font-size:12px;
+   font-weight:bold
+}
+.platitalic { 
+   font-family:Arial;
+   font-style:italic;
+   font-size:12px
+}
+.whiteintro { 
+   font-family:Times New Roman;
+   font-style:italic;
+   font-size:16px
+}
+.menu { 
+   font-family:Times New Roman;
+   font-style:italic;
+   font-size:16px
+}
+.hoofdkop {
+   font-family:Times New Roman;
+   font-style:italic;
+   font-size:46px;
+   font-weight:bold;
+   color:white
+}
+.date {
+   font-family:Times New Roman;
+   font-style:italic;
+   font-size:11px
+}

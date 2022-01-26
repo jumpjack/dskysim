@@ -1,0 +1,1607 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="Author" content="Ron Noteborn">
+   <title>DSKY Simulator</title>
+   <link rel="stylesheet" type="text/css" name="mystyle"  href="ronstyle.css">
+<STYLE type=text/css>
+<!--
+#ElScrollCtrl {
+	LEFT: 550px; POSITION: absolute; BACKGROUND:#AAAAAA; TOP: 10px; WIDTH: 15px; HEIGHT:368px; Z-INDEX: 2;
+}
+#ElDSKY {
+	LEFT: 0px; POSITION: absolute; BACKGROUND:#000000; TOP: 10px; WIDTH: 350px; HEIGHT:368px; Z-INDEX: 1;
+}
+#ElExplainChangingData {
+	LEFT: 45px; POSITION: absolute; TOP: 25px; WIDTH: 300px; HEIGHT:300px; Z-INDEX: 20; VISIBILITY:HIDDEN 
+}
+#ElExplainClearingAlarm {
+	LEFT: 45px; POSITION: absolute; TOP: 25px; WIDTH: 250px; HEIGHT:150px; Z-INDEX: 21; VISIBILITY:HIDDEN 
+}
+
+//-->
+</STYLE>
+
+<SCRIPT LANGUAGE="JavaScript">
+   <!--
+
+   NS4 = (document.layers) ? 1 : 0;
+   IE4 = (document.all) ? 1 : 0;
+   ver4 = (NS4 || IE4) ? 1 : 0;
+
+   InitialTimeToGo=5; //MINUTES
+   CA=0;
+
+   REGISTER1=0;    
+   REGISTER2=0;
+   REGISTER3=0;
+
+   VERB=-1;
+   NOUN=-1;
+   PROG=34;
+   ERROR=0;
+  
+   R1P=-1;
+   R11=-1;
+   R12=-1;
+   R13=-1;
+   R14=-1;
+   R15=-1;
+
+   R2P=-1;
+   R21=-1;
+   R22=-1;
+   R23=-1;
+   R24=-1;
+   R25=-1;
+
+   R3P=-1;
+   R31=-1;
+   R32=-1;
+   R33=-1;
+   R34=-1;
+   R35=-1;
+
+   V1=-1;
+   V2=-1;
+   N1=-1;
+   N2=-1;
+
+   KeyBoardState=0;
+   ProgState=0;
+   WaitingForAuthorisation=0;
+   WaitingForPerform=0;
+
+   Flashing=0;
+   DisplayingNoun=-1;
+   ChangingProgram=0;
+   CompStartTime=0;
+   LGCTime=0;
+
+   EventTime=0
+   TimeToEvent=0;
+   DeltaV=0;
+   DeltaVAchieved=0;
+   Ullage=0;
+   EngineOn=0;
+   UllageAcc=0.1;
+   EngineAcc=1;
+   TimeUpdatePeriod=100;
+   LastUpdateLGCTime=-1;
+
+   NumRegistersToLoad=0;
+   RegisterLoading=0;
+   DigitLoading=0;
+   IsOctal=1;
+
+   function ChangeImageOnDiv(ElId,imgid,name)
+   {
+     if (NS4) 
+       eval("document."+ElId+".document.images['"+imgid+"'].src='"+name+"';");
+     else 
+       document.images[imgid].src=name;
+   }   
+
+   function DisplayDigit(dig, image)
+   { 
+     if (dig<0)
+       ChangeImageOnDiv('ElDSKY',image,'digit-off.jpg');
+     else if (dig==0)
+       ChangeImageOnDiv('ElDSKY',image,'digit0.jpg');
+     else if (dig==1)
+       ChangeImageOnDiv('ElDSKY',image,'digit1.jpg');
+     else if (dig==2)
+       ChangeImageOnDiv('ElDSKY',image,'digit2.jpg');
+     else if (dig==3)
+       ChangeImageOnDiv('ElDSKY',image,'digit3.jpg');
+     else if (dig==4)
+       ChangeImageOnDiv('ElDSKY',image,'digit4.jpg');
+     else if (dig==5)
+       ChangeImageOnDiv('ElDSKY',image,'digit5.jpg');
+     else if (dig==6)
+       ChangeImageOnDiv('ElDSKY',image,'digit6.jpg');
+     else if (dig==7)
+       ChangeImageOnDiv('ElDSKY',image,'digit7.jpg');
+     else if (dig==8)
+       ChangeImageOnDiv('ElDSKY',image,'digit8.jpg');
+     else if (dig==9)
+       ChangeImageOnDiv('ElDSKY',image,'digit9.jpg');
+     else if (dig==10)
+       ChangeImageOnDiv('ElDSKY',image,'plusmin-off.jpg');
+     else if (dig==11)
+       ChangeImageOnDiv('ElDSKY',image,'plusmin-min.jpg');
+     else if (dig==12)
+       ChangeImageOnDiv('ElDSKY',image,'plusmin-plus.jpg');
+   }
+
+   function DrawReg(R, dig0, dig1, dig2, dig3, dig4, dig5)
+   {
+     if (R==1) 
+     {
+       DisplayDigit(dig0, 'R1PM'); 
+       DisplayDigit(dig1, 'R1D1'); 
+       DisplayDigit(dig2, 'R1D2'); 
+       DisplayDigit(dig3, 'R1D3'); 
+       DisplayDigit(dig4, 'R1D4'); 
+       DisplayDigit(dig5, 'R1D5'); 
+     }
+     else if (R==2)
+     {
+       DisplayDigit(dig0, 'R2PM'); 
+       DisplayDigit(dig1, 'R2D1'); 
+       DisplayDigit(dig2, 'R2D2'); 
+       DisplayDigit(dig3, 'R2D3'); 
+       DisplayDigit(dig4, 'R2D4'); 
+       DisplayDigit(dig5, 'R2D5'); 
+     }
+     else if (R==3)
+     {
+       DisplayDigit(dig0, 'R3PM'); 
+       DisplayDigit(dig1, 'R3D1'); 
+       DisplayDigit(dig2, 'R3D2'); 
+       DisplayDigit(dig3, 'R3D3'); 
+       DisplayDigit(dig4, 'R3D4'); 
+       DisplayDigit(dig5, 'R3D5'); 
+     }
+   }
+
+   function HideReg(R)
+   {
+     DrawReg(R,10,-1,-1,-1,-1,-1);  
+   }
+
+   function ShowRegDecimal(R)
+   {
+     if (R==1)
+       num=REGISTER1;
+     else if (R==2)
+       num=REGISTER2;
+     else if (R==3)
+       num=REGISTER3;
+
+     if (num<0)
+     {
+       dig0=11;
+       num=-num;
+     }
+     else
+       dig0=12;     
+     dig1=Math.floor(num/10000);
+     num=num-dig1*10000;
+     if (dig1>9) 
+       dig1=9;
+     dig2=Math.floor(num/1000);
+     num=num-dig2*1000;
+     dig3=Math.floor(num/100);
+     num=num-dig3*100;
+     dig4=Math.floor(num/10);
+     num=num-dig4*10;
+     dig5=Math.floor(num);
+
+     DrawReg(R, dig0, dig1, dig2, dig3, dig4, dig5);
+   }   
+
+   function ShowRegOctal(R)
+   {
+     if (R==1)
+       num=REGISTER1;
+     else if (R==2)
+       num=REGISTER2;
+     else if (R==3)
+       num=REGISTER3;
+
+     dig0=10;     
+     if (num<0)
+     {
+       dig1=-1;
+       dig2=-1;
+       dig3=-1;
+       dig4=-1;
+       dig5=-1;
+     }
+     else
+     {
+        dig1=Math.floor(num/10000);
+        num=num-dig1*10000;
+        if (dig1>9) 
+          dig1=9;
+        dig2=Math.floor(num/1000);
+        num=num-dig2*1000;
+        dig3=Math.floor(num/100);
+        num=num-dig3*100;
+        dig4=Math.floor(num/10);
+        num=num-dig4*10;
+        dig5=Math.floor(num);
+     } 
+     DrawReg(R, dig0, dig1, dig2, dig3, dig4, dig5);
+   }   
+  
+
+   function ShowRegMinSec(R, Time)
+   {
+     if (Time<0)
+       dig0=11;     
+     else
+       dig0=12;
+     Time=Math.abs(Time);
+     Min=Math.floor(Time/60);
+     Sec=Math.floor(Time-Min*60);
+
+
+     dig1=Math.floor(Min/10);
+     Min=Min-dig1*10;
+     if (dig1>9)
+       dig1=9;
+     dig2=Math.floor(Min);
+     dig3=-1; 
+     dig4=Math.floor(Sec/10);
+     Sec=Sec-dig4*10;
+     if (dig4>9)
+       dig4=9;
+     dig5=Math.floor(Sec);
+
+     DrawReg(R, dig0, dig1, dig2, dig3, dig4, dig5);
+   }   
+
+   function DrawVNP(id, dig1, dig2)
+   {
+     if (id==1)
+     {
+       DisplayDigit(dig1, 'V1'); 
+       DisplayDigit(dig2, 'V2'); 
+     }
+     else if (id==2)
+     {
+       DisplayDigit(dig1, 'N1'); 
+       DisplayDigit(dig2, 'N2'); 
+     }
+     else if (id==3)
+     {
+       DisplayDigit(dig1, 'P1'); 
+       DisplayDigit(dig2, 'P2'); 
+     }
+   }
+
+   function HideVNP(id)
+   {
+     DrawVNP(id, -1,-1);
+   }
+
+   function ShowVNP(id)
+   {
+     if (id==1)
+       num=VERB;
+     else if (id==2)
+       num=NOUN;
+     else if (id==3)
+       num=PROG;
+
+     if (num<0)
+     {
+       dig1=-1;
+       dig2=-1;
+     }
+     else
+     {
+       dig1=Math.floor(num/10);
+       dig2=Math.floor(num-dig1*10);
+     }
+     DrawVNP(id, dig1,dig2);
+   }
+
+
+   function doNothing(){}
+
+   function ErrorFunction() 
+   {}
+
+   function FlashOff()
+   {     
+     if (Flashing>0)
+     {
+       if ((Flashing&1)==1) 
+         HideVNP(1);
+       if ((Flashing&2)==2) 
+         HideVNP(2);
+       setTimeout('FlashOn()',500);
+     }
+     else
+     {
+       ShowVNP(1);
+       ShowVNP(2); 
+     }
+   }
+
+   function FlashOn()
+   { 
+     if (Flashing>0)
+     {
+       if ((Flashing&1)==1) 
+         ShowVNP(1);
+       if ((Flashing&2)==2) 
+         ShowVNP(2);
+       setTimeout('FlashOff()',500);
+     }
+   }
+ 
+   function StartFlashing(Mode)
+   {
+     if (Flashing!=0)
+       Flashing=Mode;
+     else
+     {
+       Flashing=Mode;
+       FlashOn();
+     }
+   }
+
+   
+ 
+   function UpdateVN()
+   {
+     ERROR=0;
+     if ((V1==-1) | (V2==-1))
+       ERROR=1;
+     else
+     {
+       VERB=V1*10+V2;
+       ShowVNP(1);
+       if ((N1==-1) | (N2==-1))
+         ERROR=1;
+       else
+       {
+         NOUN=N1*10+N2;
+         ShowVNP(2);
+       }
+     }
+   }
+
+   function Alarm(alid)
+   {
+     VERB=50;
+     NOUN=31;
+     REGISTER1=alid;
+     ShowVNP(1);
+     ShowVNP(2);
+     ShowRegOctal(1);
+     HideReg(2);
+     HideReg(3);
+     ERROR=alid;
+     StartFlashing(3);
+   }
+
+   function OperatorError()
+   {
+     
+   }
+
+  function DisplayTime(T)
+   {
+        Hrs=Math.floor(T/3600);
+        T=T-Hrs*3600;
+        Min=Math.floor(T/60);
+        T=T-Min*60;
+        Sec=Math.floor(T);
+        T=T-Sec;
+        FSec=Math.floor(T*100);
+
+        dig0=10;     
+        dig1=0;
+        dig2=0;
+        dig3=Math.floor(Hrs/100);
+        Hrs=Hrs-dig3*100;
+        dig4=Math.floor(Hrs/10);
+        Hrs=Hrs-dig4*10;
+        dig5=Math.floor(Hrs);
+        DrawReg(1, 10,0,0, dig3, dig4, dig5);
+
+        dig4=Math.floor(Min/10);
+        Min=Min-dig4*10;
+        dig5=Math.floor(Min);
+        DrawReg(2, 10, 0,0,0, dig4, dig5);
+
+        dig2=Math.floor(Sec/10);
+        Sec=Sec-dig2*10;
+        dig3=Math.floor(Sec);
+        dig4=Math.floor(FSec/10);
+        FSec=FSec-dig4*10;
+        dig5=Math.floor(FSec);
+        DrawReg(3, 10,0, dig2, dig3, dig4, dig5);
+   }  
+
+   function DisplayNoun34()
+   {
+     if (DisplayingNoun==34)
+     {
+       DisplayTime(EventTime);
+       setTimeout('DisplayNoun34()',500);
+     }
+   } 
+
+   function DisplayNoun35()
+   {
+     if (DisplayingNoun==35)
+     {
+       UpdateLGCTime();
+       TimeToEvent=LGCTime-EventTime; 
+       DisplayTime(Math.abs(TimeToEvent));
+       setTimeout('DisplayNoun35()',500);
+     }
+   } 
+
+
+   function DisplayNoun40()
+   {
+      UpdateLGCTime();
+      TimeToEvent=LGCTime-EventTime; 
+
+      if (DisplayingNoun==40)
+      {
+        ShowRegMinSec(1,TimeToEvent);
+        REGISTER2=DeltaV*10;
+        ShowRegDecimal(2);
+        REGISTER3=DeltaVAchieved*10;
+        ShowRegDecimal(3);     
+        setTimeout('DisplayNoun40()',500);
+      }
+   }
+
+   function DisplayNoun43()
+   {
+      UpdateLGCTime();
+      TimeToEvent=LGCTime-EventTime; 
+
+      if (DisplayingNoun==43)
+      {
+        ShowRegMinSec(3,TimeToEvent);
+        REGISTER1=900;
+        ShowRegDecimal(1);
+        REGISTER2=1000;
+        ShowRegDecimal(2);     
+        setTimeout('DisplayNoun43()',500);
+      }
+   }
+
+   function DisplayNoun65()
+   {
+     if (DisplayingNoun==65)
+     {
+       UpdateLGCTime();
+       DisplayTime(LGCTime);
+       setTimeout('DisplayNoun65()',500);
+     }
+   } 
+
+
+ 
+
+   function RunProgram40()
+   {
+     if (PROG!=40)
+       return;
+     if (ProgState==0)
+     {
+       ProgState=1;
+       setTimeout('RunProgram40()',3000);
+     }
+     else if (ProgState==1)
+     {
+       REGISTER1=68;
+       REGISTER2=-5;
+       REGISTER3=15.8;
+       ShowRegDecimal(1);
+       ShowRegDecimal(2);
+       ShowRegDecimal(3);
+       ProgState=2;
+       WaitingForAuthorisation=1;
+       VERB=50;
+       NOUN=01;
+       ShowVNP(1);
+       ShowVNP(2);       
+
+       setTimeout('RunProgram40()', 500);         
+       StartFlashing(3);
+     }
+     else if (ProgState==2)
+     {
+       if (WaitingForAuthorisation!=1)
+         ProgState=3;
+       setTimeout('RunProgram40()', 500);         
+     }
+     else if (ProgState==3)
+     {
+        Flashing=0;
+        HideReg(1);
+        HideReg(2);
+        HideReg(3);
+        HideVNP(1);
+        HideVNP(2);
+        ProgState=4;
+        setTimeout('RunProgram40()', 1500);
+     }
+     else if (ProgState==4)
+     {
+       REGISTER1=-10*100;
+       REGISTER2=+3*100;
+       REGISTER3=-2*100;
+       ShowRegDecimal(1);
+       ShowRegDecimal(2);
+       ShowRegDecimal(3);
+       ProgState=5;
+       WaitingForAuthorisation=1;
+       VERB=50;
+       NOUN=01;
+       ShowVNP(1);
+       ShowVNP(2);       
+
+       setTimeout('RunProgram40()', 500);         
+       StartFlashing(3);
+     }
+     else if (ProgState==5)
+     {
+       if (WaitingForAuthorisation!=1)
+         ProgState=6;
+       setTimeout('RunProgram40()', 500);         
+     }
+     else if (ProgState==6)
+     {
+        Flashing=0;
+        HideReg(1);
+        HideReg(2);
+        HideReg(3);
+        HideVNP(1);
+        HideVNP(2);
+        ProgState=7;
+        setTimeout('RunProgram40()', 1500);
+     }
+     else if (ProgState==7)
+     { 
+         VERB=15;
+         NOUN=40;
+         ShowVNP(1); 
+         ShowVNP(2);
+         DisplayingNoun=40;
+         DisplayNoun40();
+         ProgState=8;
+         setTimeout('RunProgram40()', 500);
+     }
+     else if (ProgState==8)
+     {
+         if (TimeToEvent>=-45)
+         {
+           DisplayingNoun=-1;
+           Alarm(400);
+           WaitingForPerform=1;
+           ProgState=9;
+         }
+         else
+           ProgState=10;
+         setTimeout('RunProgram40()', 100);
+     }
+     else if (ProgState==9)
+     {      
+       if ((ERROR==0) & (DisplayingNoun!=40))
+       {
+         DisplayingNoun=40;
+         DisplayNoun40();         
+       }
+
+       if (WaitingForPerform==0)
+       {
+         ProgState=10; 
+         if (DisplayingNoun!=40)
+         {
+           DisplayingNoun=40;
+           DisplayNoun40();         
+         }
+       }
+       setTimeout('RunProgram40()', 100);
+     }
+     else if (ProgState==10)
+     {
+         if (TimeToEvent>=-30)
+         {
+           Ullage=1;
+           EngineOn=0;
+           ProgState=11;
+         }
+         setTimeout('RunProgram40()', 100);
+     }
+     else if (ProgState==11)
+     {
+       if (TimeToEvent>=-5)
+       {
+         VERB=50;
+         NOUN=99;
+         ShowVNP(1); 
+         ShowVNP(2);
+         WaitingForPerform=1;
+         StartFlashing(3);
+         ProgState=12;
+       }
+       setTimeout('RunProgram40()', 100);             
+     }
+     else if (ProgState==12)
+     {
+       if (WaitingForPerform==0)
+         ProgState=13; 
+       setTimeout('RunProgram40()', 100);
+     }
+     else if (ProgState==13)
+     {        
+         if (TimeToEvent>=0)
+         {
+           Ullage=0;
+           EngineOn=1;
+           ProgState=14;
+           EventTime=LGCTime+(DeltaV-DeltaVAchieved)/EngineAcc;
+         }
+         setTimeout('RunProgram40()', 100);
+     }
+     else if (ProgState==14)
+     {        
+         if (DeltaVAchieved>=DeltaV)
+         {
+           DisplayingNoun=-1;
+           EngineOn=0;
+           ProgState=15;
+           VERB=50;
+           NOUN=01;
+           WaitingForAuthorisation=1;
+           // RESIDUALS
+           REGISTER1=-3;
+           REGISTER2=-11;
+           REGISTER3=+5;
+           ShowRegDecimal(1);
+           ShowRegDecimal(2);
+           ShowRegDecimal(3);
+           ShowVNP(1);
+           ShowVNP(2);       
+           StartFlashing(3);
+ 
+           EventTime=LGCTime+45*60;
+         }
+         setTimeout('RunProgram40()', 100);
+     }
+     else if (ProgState==15)
+     {
+       if (WaitingForAuthorisation==0)
+       {
+          Flashing=0;
+          HideReg(1);
+          HideReg(2);
+          HideReg(3);
+          HideVNP(1);
+          HideVNP(2);
+          ProgState=16; 
+       }
+       setTimeout('RunProgram40()', 100);
+     }
+     else if (ProgState==16)
+     {
+       DisplayingNoun=43;
+       DisplayNoun43();
+       ProgState=17;
+       VERB=15;
+       NOUN=54;
+       WaitingForAuthorisation=1;
+       ShowVNP(1);
+       ShowVNP(2);       
+       StartFlashing(3);
+       setTimeout('RunProgram40()', 100);
+     }
+     else if (ProgState==17)
+     {
+       if (WaitingForAuthorisation==0)
+         ProgState=18; 
+       setTimeout('RunProgram40()', 100);
+     }
+     else if (ProgState==18)
+     {
+       //REQUEST PROGRAM CHANGE
+       ProgState=19;
+       VERB=50;
+       NOUN=07;
+       ShowVNP(1);
+       ShowVNP(2);       
+       StartFlashing(3);
+       setTimeout('RunProgram40()', 100);
+     }
+   }  
+ 
+   function ChangeProgram(id)
+   {
+     if (id==0)
+     {
+       PROG=00;
+       ShowVNP(3);
+       ProgState=0;
+       Flashing=0;
+       DisplayingNoun=0;
+       WaitingForAuthorisation=0; 
+       WaitingForPerform=0;
+     }
+     else if (id==40)
+     {
+       PROG=40;
+       ShowVNP(3);
+       ProgState=0;
+       Flashing=0;
+       DisplayingNoun=0;
+       WaitingForAuthorisation=0; 
+       WaitingForPerform=0;
+       RunProgram40();   
+     }
+     else 
+     {
+       // Flash OPR ERROR light
+       OperatorError();
+     }
+   }
+
+  
+   function ProcessRequest()
+   {
+     HideVNP(1);
+     HideVNP(2);
+     UpdateVN();
+
+     if ((VERB==0) | ((NOUN==0) & (VERB!=37)))
+       OperatorError();
+     else if (VERB==25)
+     {
+        //Load 3 components of ...
+        DisplayingNoun=-1;
+        KeyBoardState=10;
+        DigitLoading=0;
+        RegisterLoading=1;
+        NumRegistersToLoad=3; 
+        VERB=21;
+        ShowVNP(1);
+        Flashing=3;
+        FlashOn();
+        REGISTER1=-1;  R1P=10;R11=-1;R12=-1;R13=-1;R14=-1;R15=-1;
+        REGISTER2=-1;  R2P=10;R21=-1;R22=-1;R23=-1;R24=-1;R25=-1;
+        REGISTER3=-1;  R3P=10;R31=-1;R32=-1;R33=-1;R34=-1;R35=-1;
+        DrawReg(1, R1P, R11, R12, R13, R14, R15);
+        DrawReg(2, R2P, R21, R22, R23, R24, R25);
+        DrawReg(3, R3P, R31, R32, R33, R34, R35);
+     }
+     else if (VERB==33)
+     {
+       //PROCEED WITHOUT DATA
+       WaitingForAuthorisation=0;
+       WaitingForPerform=0;
+       Flashing=0;
+     }
+     else if (VERB==34)
+     {
+       //TERMINATION  
+       ChangingProgram=0;
+       Flashing=0;
+       HideReg(1);
+       HideReg(2);
+       HideReg(3);
+       HideVNP(1);
+       HideVNP(2);
+       ChangeProgram(0);
+       Flashing=0; 
+     }
+     else if (VERB==37)
+     {
+       if (ChangingProgram==0)
+       {
+         NOUN=-1;
+         N1=-1;
+         N2=-1;
+         DrawVNP(2,N1,N2);
+         StartFlashing(1);
+         ChangingProgram=1;
+         KeyBoardState=2;
+       }
+       else
+       {
+         ChangingProgram=0;
+         Flashing=0;
+         ChangeProgram(NOUN);
+       }
+     }
+     else if ((VERB==5) | (VERB==6))
+     {
+       if (NOUN==65)
+       {
+         DisplayingNoun=65;
+         DisplayNoun65();
+         DisplayingNoun=-1;
+       }
+       else if (NOUN==40)
+       {
+         DisplayingNoun=40;
+         DisplayNoun40();
+         DisplayingNoun=-1;
+       }
+       else if (NOUN==34)
+       // EVENT TIME
+       {
+         DisplayingNoun=34;
+         DisplayNoun34();
+         DisplayingNoun=-1;
+       }
+       else if (NOUN==35)
+       // DELTA EVENT TIME
+       {
+         DisplayingNoun=35;
+         DisplayNoun35();
+         DisplayingNoun=-1;
+       }
+     }
+     else if ((VERB==15) | (VERB==16))
+     {
+       if (NOUN==65)
+       {
+         DisplayingNoun=65;
+         DisplayNoun65();
+       }
+       else if (NOUN==40)
+       {
+         DisplayingNoun=40;
+         DisplayNoun40();
+       }
+       else if (NOUN==34)
+       // EVENT TIME
+       {
+         DisplayingNoun=34;
+         DisplayNoun34();
+       }
+       else if (NOUN==35)
+       // DELTA EVENT TIME
+       {
+         DisplayingNoun=35;
+         DisplayNoun35();
+       }
+     }
+   }
+
+   function RSETKeyPressed()
+   { 
+     if (ERROR!=0)
+     {
+       ERROR=0;
+       Flashing=0; 
+       HideReg(1);
+       HideReg(2);
+       HideReg(3);
+       HideVNP(1);
+       HideVNP(2);
+     }
+   }
+
+   function ProcessRegisterEntry(Key)
+   {
+     if (RegisterLoading==0)
+       return;
+
+     // process key for loading data
+     if (Key==23)
+     {
+       //CLEAR KEY
+       if (DigitLoading>0)
+       {
+         DigitLoading=0;
+         if (RegisterLoading==1)
+           IsOctal=1;
+         if (RegisterLoading==1)
+         {
+           REGISTER1=-1;  R1P=10;R11=-1;R12=-1;R13=-1;R14=-1;R15=-1;
+           DrawReg(1, R1P, R11, R12, R13, R14, R15);
+           VERB=21;
+         }
+         else if (RegisterLoading==2)
+         {
+           REGISTER2=-1;  R2P=10;R21=-1;R22=-1;R23=-1;R24=-1;R25=-1;
+           DrawReg(2, R2P, R21, R22, R23, R24, R25);
+           VERB=22;
+         }
+         else if (RegisterLoading==3)
+         {
+           REGISTER3=-1;  R3P=10;R31=-1;R32=-1;R33=-1;R34=-1;R35=-1;
+           DrawReg(3, R3P, R31, R32, R33, R34, R35);
+           VERB=23;
+         }
+       }
+       else
+       {
+         RegisterLoading=RegisterLoading-1;
+         if (RegisterLoading==0)
+           RegisterLoading=1;
+         else
+         {
+           if (RegisterLoading==1)
+           {
+             REGISTER1=-1;  R1P=10;R11=-1;R12=-1;R13=-1;R14=-1;R15=-1;
+             DrawReg(1, R1P, R11, R12, R13, R14, R15);
+             VERB=21;
+           }
+           else if (RegisterLoading==2)
+           {
+             REGISTER2=-1;  R2P=10;R21=-1;R22=-1;R23=-1;R24=-1;R25=-1;
+             DrawReg(2, R2P, R21, R22, R23, R24, R25);
+             VERB=22;
+           }
+           else if (RegisterLoading==3)
+           {
+             REGISTER3=-1;  R3P=10;R31=-1;R32=-1;R33=-1;R34=-1;R35=-1;
+             DrawReg(3, R3P, R31, R32, R33, R34, R35);
+             VERB=23; 
+           }
+         }
+       }
+     }
+
+     else if ((Key==20) | (Key==21))
+     // PLUS AND MINUS
+     {
+       if ((DigitLoading==0) & (RegisterLoading==1))
+       {
+         IsOctal=0;
+         if (Key==20)
+           R1P=12;
+         else
+           R1P=11;
+         DrawReg(1,R1P,R11,R12,R13,R14,R15); 
+       }
+       else
+       if ((DigitLoading==0) & (IsOctal==0))
+       {
+         if (RegisterLoading==2)
+         {
+           if (Key==20)
+             R2P=12;
+           else
+             R2P=11;
+           DrawReg(2,R2P,R21,R22,R23,R24,R25); 
+         }
+         else if (RegisterLoading==3)
+         {
+           if (Key==20)
+             R3P=12;
+           else
+             R3P=11;
+           DrawReg(3,R3P,R31,R32,R33,R34,R35); 
+         }
+       }   
+     }
+
+     // KEYS 8 AND 9 only allowed in decimal mode
+     else if (((Key==8) | (Key==9)) & (IsOctal==1))
+       OperatorError();
+
+     // ENTER KEY (decimals need 5 digits plus sign)
+     else if (Key==12)
+     {
+       if (IsOctal==0)
+       {
+         if (DigitLoading<=5)
+         {
+           OperatorError();
+           return;
+         }
+       }
+       //next register
+       DigitLoading=0;
+       RegisterLoading=RegisterLoading+1;
+       if (RegisterLoading>NumRegistersToLoad)
+       {
+         KeyBoardState=0;
+         RegisterLoading=0;
+         Flashing=0;
+         HideReg(1);
+         HideReg(2);
+         HideReg(3);
+         WaitingForAuthorisation=0;
+       }
+       else
+         VERB=VERB+1;
+     }
+     else
+
+     // KEYS 0 to 9
+     {
+       if (IsOctal==0)
+       {
+         if (((RegisterLoading==2) & (R2P==10)) |
+             ((RegisterLoading==3) & (R3P==10)) )
+         {
+           ErrorFunction();
+           return;
+         }
+       }
+       if (RegisterLoading==1)
+       { 
+         if ((DigitLoading==0) | (DigitLoading==1))
+         {
+           R11=Key;
+           DigitLoading=1; 
+         }
+         else if (DigitLoading==2)
+           R12=Key;
+         else if (DigitLoading==3)
+           R13=Key;
+         else if (DigitLoading==4)
+           R14=Key;
+         else if (DigitLoading==5)
+           R15=Key;
+         DrawReg(1,R1P,R11,R12,R13,R14,R15); 
+         DigitLoading=DigitLoading+1;
+       }
+       else if (RegisterLoading==2)
+       { 
+         if ((DigitLoading==0) | (DigitLoading==1))
+         {
+           R21=Key;
+           DigitLoading=1; 
+         }
+         else if (DigitLoading==2)
+           R22=Key;
+         else if (DigitLoading==3)
+           R23=Key;
+         else if (DigitLoading==4)
+           R24=Key;
+         else if (DigitLoading==5)
+           R25=Key;
+         DrawReg(2,R2P,R21,R22,R23,R24,R25); 
+         DigitLoading=DigitLoading+1;
+       }
+       else if (RegisterLoading==3)
+       { 
+         if ((DigitLoading==0) | (DigitLoading==1))
+         {
+           R31=Key;
+           DigitLoading=1; 
+         }
+         else if (DigitLoading==2)
+           R32=Key;
+         else if (DigitLoading==3)
+           R33=Key;
+         else if (DigitLoading==4)
+           R34=Key;
+         else if (DigitLoading==5)
+           R35=Key;
+         DrawReg(3,R3P,R31,R32,R33,R34,R35); 
+         DigitLoading=DigitLoading+1;
+       }
+     }       
+   }
+
+   function PressedKey(Key)
+   {    
+     if (Key==10)
+     // VERB
+     {
+        KeyBoardState=1;
+        Flashing=0;
+        V1=-1;
+        V2=-1;
+        VERB=-1; 
+        ShowVNP(1);  
+     }
+     else if (Key==11)
+     // NOUN
+     {
+        KeyBoardState=2;
+        Flashing=0;
+        N1=-1;
+        N2=-1;
+        NOUN=-1;
+        ShowVNP(2);
+     }
+     else if (Key==12)
+     // ENTER 
+     { 
+       if (WaitingForPerform==1)
+       {
+         WaitingForPerform=0;
+         Flashing=0;
+         VERB=-1;
+         NOUN=-1;
+         ShowVNP(1);
+         ShowVNP(2);
+       }
+       else if ((KeyBoardState==1) | (KeyBoardState==2)) 
+       {
+         KeyBoardState=0;
+         ProcessRequest();  
+       }
+       else
+         ProcessRegisterEntry(Key);
+     }
+     else if (Key==24)
+     // RSET
+       RSETKeyPressed();
+     else if (Key==23)
+     {
+       if (KeyBoardState==10)
+         ProcessRegisterEntry(Key);
+     }
+     else if ((Key>=0) & (Key<=9))
+     {
+       if (KeyBoardState==1)
+       {
+         if ((Key==8) | (Key==9))
+            ErrorFunction();
+         else
+         if (V1<0)
+           V1=Key;
+         else if (V2<0)
+           V2=Key;
+         DrawVNP(1, V1,V2);
+       }
+       else
+       if (KeyBoardState==2)
+       {
+         if ((Key==8) | (Key==9))
+            ErrorFunction();
+         else
+         if (N1<0)
+           N1=Key;
+         else if (N2<0)
+           N2=Key;
+         DrawVNP(2, N1,N2);
+       }
+       else if (KeyBoardState==10)
+         ProcessRegisterEntry(Key);
+     }
+     else if ((Key==20) | (Key==21))
+     {
+        if (KeyBoardState==10)
+          ProcessRegisterEntry(Key);
+     }
+   }
+
+
+
+   function FlashActy()
+   {
+     if (CA==0)     
+     {
+       ChangeImageOnDiv('ElDSKY','COMPACTY',"dsky-compacty-on.jpg");
+       CA=1;
+       setTimeout('FlashActy()',Math.floor(Math.random()*200));
+     }
+     else
+     {
+       ChangeImageOnDiv('ElDSKY','COMPACTY',"dsky-compacty-off.jpg");
+       CA=0;
+       setTimeout('FlashActy()',Math.floor(Math.random()*3500));
+
+     }
+   }
+   function UpdateLGCTime()
+   {
+     var Digital=new Date();
+     var hours=Digital.getHours();
+     var minutes=Digital.getMinutes();
+     var seconds=Digital.getSeconds();
+     var mseconds=Digital.getMilliseconds();
+     CompCurrentTime=hours*3600+minutes*60+seconds+mseconds/1000;
+     ElapsedTime=CompCurrentTime-CompStartTime;
+     LGCTime=100*3600+20*60+15+0.45 + ElapsedTime;   
+   }
+
+   function UpdateTime()
+   {
+     UpdateLGCTime();
+     if (LastUpdateLGCTime>=0)
+       UpdatePeriodElapsed=LGCTime-LastUpdateLGCTime; 
+     else
+       UpdatePeriodElapsed=0;
+     LastUpdateLGCTime=LGCTime; 
+
+     TimeToEvent=LGCTime-EventTime; 
+
+     if (Ullage==1)
+       DeltaVAchieved=DeltaVAchieved+UllageAcc*(UpdatePeriodElapsed);
+     if (EngineOn==1)
+       DeltaVAchieved=DeltaVAchieved+EngineAcc*(UpdatePeriodElapsed);
+    
+     setTimeout('UpdateTime()',TimeUpdatePeriod);
+   }
+   
+   function StartTime()
+   {  
+     var Digital=new Date();
+     var hours=Digital.getHours();
+     var minutes=Digital.getMinutes();
+     var seconds=Digital.getSeconds();
+     var mseconds=Digital.getMilliseconds();
+     CompStartTime=hours*3600+minutes*60+seconds+mseconds/1000;
+     UpdateLGCTime();
+     EventTime=LGCTime+InitialTimeToGo*60;
+     DeltaV=70;
+     setTimeout('UpdateTime()',250);
+     setTimeout('FlashActy()',1000);
+   }
+
+  ExplanationOpenNow=0;
+
+  function HideExplanation(id)
+  {
+     if (id==1)
+        El='ElExplainChangingData';
+     else if (id==2)
+        El='ElExplainClearingAlarm';
+     else
+       return;     
+
+     if (NS4)
+       eval("document."+El+".visibility='hide';");       
+     else
+       eval("document.all."+El+".style.visibility='hidden';");
+
+     ExplanationOpenNow=0;
+  }
+
+
+  function ShowExplanation(id)
+  {
+     if (id==1)
+        El='ElExplainChangingData';
+     else if (id==2)
+        El='ElExplainClearingAlarm';
+     else
+       return;     
+
+     if (NS4)
+       eval("document."+El+".visibility='show';");       
+     else
+       eval("document.all."+El+".style.visibility='visible';");
+
+     HideExplanation(ExplanationOpenNow);
+     ExplanationOpenNow=id; 
+  }
+   
+   //-->
+  </SCRIPT>
+</head>
+
+<body text="#FFFFFF" bgcolor="#000000" link="#00FFFF" vlink="#00FFF" alink="#FFFFFF" marginheight="0" marginwidth="0">
+
+<script>
+nextimage1 = new Image ();
+nextimage1 . src = "digit-off.jpg";
+nextimage2 = new Image ();
+nextimage2 . src = "digit0.jpg";
+nextimage3 = new Image ();
+nextimage3 . src = "digit1.jpg";
+nextimage4 = new Image ();
+nextimage4 . src = "digit2.jpg";
+nextimage5 = new Image ();
+nextimage5 . src = "digit3.jpg";
+nextimage6 = new Image ();
+nextimage6 . src = "digit4.jpg";
+nextimage7 = new Image ();
+nextimage7 . src = "digit5.jpg";
+nextimage8 = new Image ();
+nextimage8 . src = "digit6.jpg";
+nextimage9 = new Image ();
+nextimage9 . src = "digit7.jpg";
+nextimage10 = new Image ();
+nextimage10 . src = "digit8.jpg";
+nextimage11 = new Image ();
+nextimage11 . src = "digit9.jpg";
+nextimage12 = new Image ();
+nextimage12 . src = "plusmin-min.jpg";
+nextimage13 = new Image ();
+nextimage13 . src = "plusmin-plus.jpg";
+nextimage14 = new Image ();
+nextimage14 . src = "dsky-compacty-on.jpg";
+</script>
+
+<div id=ElExplainChangingData>
+  <TABLE CELLSPACING=1 BGCOLOR="#408080" WIDTH=300>
+  <TR><TD>
+      <TABLE CELLPADDING=1 CELLSPACING=0 BGCOLOR="#c0c0c0" WIDTH=300>
+      <TR><TD BGCOLOR="#408080">
+          <a href="javascript:HideExplanation(1)"><img src="closecross.gif" width="15" height="15" alt="" border=0></a>
+      </TD>
+      <TD BGCOLOR="#408080">
+          <span class="subkop"><font color=#FFFFFF>Changing data with the Keyboard</font></span>
+      </TD></TR>
+      <TR><TD colspan=2><span class="plat"><font color=#000000>For changing or entering data you can use VERB 25 and the appropriate NOUN for the data you want to enter. Let us assume you want to enter data with NOUN number 30. Then you would key</font><br></span>
+<span class="platvet"><font color="#000000">VERB 25 NOUN 30 ENTER</font><br></span>
+<span class="plat"><font color="#000000">You can see now that the verb and noun start flashing, and they will untill you have entered all three registers.</font></span><br><br>
+<span class="plat"><font color="#000000">The computer knows two formats: decimal and octal. In decimal format you have to start with a + or a -, to show it is decimal. If not, the computer will assume that the number is octal. When the number is decimal you have to use 5 digits plus the sign digit. If it is octal you may use any number of digits. In octal sense, the 8 and the 9 can ofcourse not be used. Furthermore, if the format is decimal, then all registers should have decimal data, so you can not have one decimal and the other two octal.</font></span><br><br>
+<span class="plat"><font color="#000000">Now you can start entering the numbers, and after each register you press ENTER, to get to the next. Use CLEAR to clear a register and start again. Multiple CLEAR presses also clears the register above the current one.</font></span><br><br>
+<span class="plat"><font color="#000000">Note that each register has its own verb: you start with 21 for the first, and it changes to 22 and 23 for the other 2.</font></span><br><br>
+         <a href="javascript:HideExplanation(1)"><span class="platitalic">CLOSE</span></a>
+      </TD></TR>
+      </TABLE>
+  </TD></TR></TABLE>
+</div>
+
+<div id=ElExplainClearingAlarm>
+  <TABLE CELLSPACING=1 BGCOLOR="#408080" WIDTH=300>
+  <TR><TD>
+      <TABLE CELLPADDING=1 CELLSPACING=0 BGCOLOR="#c0c0c0" WIDTH=300>
+      <TR><TD BGCOLOR="#408080">
+          <a href="javascript:HideExplanation(2)"><img src="closecross.gif" width="15" height="15" alt="" border=0></a>
+      </TD>
+      <TD BGCOLOR="#408080">
+          <span class="subkop"><font color=#FFFFFF>Clearing the alarm</font></span>
+      </TD></TR>
+      <TR><TD colspan=2><span class="plat"><font color=#000000>If you see the VERB and NOUN flashing with VERB 50 and NOUN 31 and in register 1 you see a number, then you are looking at an alarm. The nature of the alarm is given by register 1.</font></span><br><br>
+<span class="plat"><font color=#000000>You can clear the alarm with the RSET key, and then either proceed (VERB 33 ENTER) or terminate (VERB 34 ENTER).</font></span><br><br>
+         <a href="javascript:HideExplanation(2)"><span class="platitalic">CLOSE</span></a>
+      </TD></TR>
+      </TABLE>
+  </TD></TR></TABLE>
+</div>
+
+<div id=ElDSKY><CENTER><table cellspacing=0 cellpadding=0 border=0 bgcolor="#000000">
+<tr>
+<td colspan=3><img src="dsky-top.jpg" alt=""></td>
+</tr>
+<tr>
+<td><img src="dsky-lights.jpg" width="180" height="194" alt=""></td>
+<td><table cellspacing=0 cellpadding=0 border=0 bgcolor="#000000">
+<tr>
+<td colspan=3 rowspan=2><img src="dsky-compacty-off.jpg" alt="" NAME="COMPACTY" height=47 width=49></td>
+<td rowspan=4 valign=top><img src="dsky-leftPN.jpg" width="29" height="93" alt=""></td>
+<td><img src="dsky-prog.jpg" alt=""></td>
+</tr>
+
+<tr>
+<td><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="P1"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="P2"></td>
+</tr>
+<tr>
+<td colspan=3><img src="dsky-verb.jpg" alt=""></td>
+<td valign=top><img src="dsky-noun.jpg" alt=""></td>
+</tr>
+
+<tr>
+<td rowspan=7><img src="dsky-leftV.jpg" width="10" height="124" alt=""></td>
+<td><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="V1"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="V2"></td>
+<td><img src="spacer.gif" width=7 height=23 alt=""></td>
+<td><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="N1"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="N2"></td>
+</tr>
+
+<tr>
+<td colspan=4><img src="dsky-line1.jpg" width="100" height="10" alt=""></td>
+</tr>
+
+<tr>
+<td colspan=4><img src="plusmin-off.jpg" width="16" height="23" alt="" border="0" name="R1PM"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R1D1"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R1D2"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R1D3"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R1D4"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R1D5"></td>
+</tr>
+
+<tr>
+<td colspan=4><img src="dsky-line2.jpg" width="100" height="11" alt=""></td>
+</tr>
+
+<tr>
+<td colspan=4><img src="plusmin-off.jpg" width="16" height="23" alt="" border="0" name="R2PM"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R2D1"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R2D2"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R2D3"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R2D4"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R2D5"></td>
+</tr>
+
+<tr>
+<td colspan=4><img src="dsky-line3.jpg" width="100" height="11" alt=""></td>
+</tr>
+
+<tr>
+<td colspan=4><img src="plusmin-off.jpg" width="16" height="23" alt="" border="0" name="R3PM"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R3D1"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R3D2"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R3D3"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R3D4"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R3D5"></td>
+</tr>
+
+</table></td>
+<td><img src="dsky-rightPN.jpg" alt=""></td>
+</tr>
+
+<tr>
+<map NAME="DSKYMAP">
+<area SHAPE="RECT" COORDS="11,42,51,82"  HREF="javascript:PressedKey(10);">
+<area SHAPE="RECT" COORDS="11,85,51,125"  HREF="javascript:PressedKey(11);">
+
+<area SHAPE="RECT" COORDS="54,21,94,61"     HREF="javascript:PressedKey(20);">
+<area SHAPE="RECT" COORDS="54,62,94,102"    HREF="javascript:PressedKey(21);">
+<area SHAPE="RECT" COORDS="54,106,94,146"  HREF="javascript:PressedKey(0);">
+
+<area SHAPE="RECT" COORDS="97,21,137,61"  HREF="javascript:PressedKey(7);">
+<area SHAPE="RECT" COORDS="97,62,137,102"  HREF="javascript:PressedKey(4);">
+<area SHAPE="RECT" COORDS="97,106,137,146"  HREF="javascript:PressedKey(1);">
+
+<area SHAPE="RECT" COORDS="140,21,180,61"  HREF="javascript:PressedKey(8);">
+<area SHAPE="RECT" COORDS="140,62,180,102"  HREF="javascript:PressedKey(5);">
+<area SHAPE="RECT" COORDS="140,106,180,146"  HREF="javascript:PressedKey(2);">
+
+<area SHAPE="RECT" COORDS="186,21,226,61"  HREF="javascript:PressedKey(9);">
+<area SHAPE="RECT" COORDS="186,62,226,102"  HREF="javascript:PressedKey(6);">
+<area SHAPE="RECT" COORDS="186,106,226,146"  HREF="javascript:PressedKey(3);">
+
+<area SHAPE="RECT" COORDS="229,21,269,61"  HREF="javascript:PressedKey(23);">
+<area SHAPE="RECT" COORDS="229,62,269,102"  HREF="javascript:PressedKey(13);">
+<area SHAPE="RECT" COORDS="229,106,269,146"  HREF="javascript:PressedKey(22);">
+
+<area SHAPE="RECT" COORDS="271,42,311,82"  HREF="javascript:PressedKey(12);">
+<area SHAPE="RECT" COORDS="271,85,311,125"  HREF="javascript:PressedKey(24);">
+</map>
+<td colspan=3><img src="dsky-keypad.jpg" alt="" usemap="#DSKYMAP" border="0"></td>
+</tr>
+
+</table></CENTER>
+<br>
+<br>
+<span class="date">This page was last edited on August 10, 2001 by RoN.<br>Copyright by Ron Noteborn, 2001.</span>
+</DIV>
+
+<div id=ELScrollCtrl><table cellpadding="0" cellspacing="0" bgcolor="#AAAAAA" border=0>
+<tr>
+<td><center><a href="javascript:moveup()"><img src="scroll-arrow-up.jpg" alt="Up" width="15" height="15" border=0></a></center></td>
+</tr>
+<tr>
+<td><center><a href="javascript:stopscroll()"><img src="scroll-arrow-stop.jpg" alt="Stop" width="15" height="15" border=0></a></center></td>
+</tr>
+<tr>
+<td><center><a href="javascript:movedown()"><img src="scroll-arrow-down.jpg" alt="Down" width="15" height="15" border=0></a></center></td>
+</tr>
+<tr>
+<td><img src="spacer.gif" alt="" width="15" height="320"></td>
+</tr>
+</table>
+</div>
+
+<SCRIPT language="JavaScript1.2">
+
+//Manual Scroller- © Dynamic Drive 2001
+//For full source code, visit http://www.dynamicdrive.com
+
+//specify speed of scroll (greater=faster)
+var speed=15;
+
+iens6=document.all||document.getElementById;
+ns4=document.layers;
+
+if (iens6)
+{
+  document.write('<div id="container" style="position:absolute; top:10; left:350; width:200; height:368px; overflow:hidden; border:2px ridge white">');
+  document.write('<div id="content" style="position:absolute; width:190; left:0;top:0">');
+}
+</script>
+
+<ilayer name="nscontainer" top=10 left=350 width=200 height=324 clip="0,0,195,368">
+<layer name="nscontent" width=200 height=368 visibility=hidden>
+
+<!--INSERT CONTENT HERE-->
+<span class="subkop">Operating the Apollo LM DSKY</span><br>
+<span class="platitalic"><font color=#80ff00>Use the arrow buttons to the right to scroll.</font></span><br><br>
+<span class="plat">With this javascript DSKY you can get a bit of a feeling what it was like to work with the DSKY. The astronauts used this device to communicate with the guidance computer. The crew could ask and pass information to the computer and vice versa. It was sometimes even called 'the third crew member'!</span><br><br>
+<span class="plat">This simulator knows only part of the real DSKY, but there are sufficient features to actually perform an orbit change with the descent engine!</span><br><br>
+<span class="plat">A look around on the panel shows you:<br>
+<li>some status lights,</li><br>
+<li>a flashing ligt (COMPACTY) which indicates computer activity,</li><br>
+<li>a PROG indicator with a number, which is the identifier of the program that is running now,</li><br>
+<li>a VERB and NOUN with numbers that are dimmed, read about those below</li><br>
+<li>three rows with numbers, these are called REGISTERS and can display usefull info</li><br>
+<li>and a keyboard with numerical and function keys.</li></span><br><br>
+<span class="plat">The basic way of communicating with the computer was via VERB and NOUN codes. The verb codes were a kind of action requests, while the nouns indicated what that action should be taken upon. Verb 05 means display, and Noun 65 means LGC time. So if you now would press</span><br><br>
+<span class="platvet"><lu>VERB 05 NOUN 65 ENTER</span><br><br>
+<span class="plat">you will get the time of the computer. Try it for yourself. If you make a mistake, just press the VERB or NOUN key again, and try again.</span><br><br>
+<span class="plat">If you keyed the codes correctly, you will now see three numbers in the display below the verb and noun code. These three displays are the REGISTERS, the first one is REGISTER 1, then 2 and finally 3. When displaying noun 65, you see the elapsed time since launch in hours (register 1), minutes (R2) and hundredths of seconds (3).</span><br><br>
+<span class="plat">Another way of displaying things is to monitor them. If you monitor something, you will have a periodic update of it. Monitor can be done with verb 15. Try it out! Key in:</span><br><br>
+<span class="platvet">VERB 15 ENTER</span><br><br>
+<span class="plat">Notice that you don't need to enter the noun, since that is still there! Otherwise, key NOUN 65 before the ENTER, but after the VERB 15.</span><br><br>
+<span class="plat">If correct, you now see that the time is being updated regularly.</span><br><br>
+<span class="platvet">Performing a program change</span><br>
+<span class="plat">To begin the maneuver, we have to change the program to P40. We do that by:</span><br>
+<span class="platvet">VERB 37 ENTER</span><br>
+<span class="plat">Note that the VERB number now starts flashing. This is to indicate that the computer needs more information. Therefore give it the program number 40:</span><br>
+<span class="platvet">40 ENTER</span><br>
+<span class="plat">The flashing should stop now, and you should see that PROG has changed to 40. Ok, we are beginning the procedure now. First the computer will ask you to authorise the change in velocity that it has computed before in P34 (the program you just came from). In a second you will see that the three registers contain numbers, which are the velocity changes in feet/sec on each axis. You'll have to authorise this and we can do that by keying:</span><br>
+<span class="platvet">VERB 33 ENTER</span><br>
+<span class="plat">which means 'Proceed without data'. You basically tell the computer here to go on with what it has. You could also have terminated the program completely (VERB 34) or <a href="javascript:ShowExplanation(1);">entered new values</a>.</span><br><br>
+<span class="plat">The next thing the program does is to give you the gimbal angles that the stable platform will see at the end of the burn. Authorise here again with <b>VERB 33 ENTER</b>.</span><br><br>
+<span class="plat">Now the program will start monitoring NOUN 40. This gives you the time until the ignition in minutes and seconds in R1, the desired delta v in tenths of feet per second in R2 and the achieved delta v in R3, which is ofcourse 0 as the engine is not running yet! The next action will be at T - 30 seconds. If we are now closer than 45 seconds (maybe you were too slow!), you will see an <a href="javascript:ShowExplanation(2);">ALARM that you have to clear</a>. Otherwise, the count down starts and you can see time ticking away.</span><br><br>
+<span class="plat">At T-30 seconds, the computer starts the ullage burn with the RCS to settle the propellants in the tanks. You can see that in register 3 that slowly starts counting: the LM is changing its velocity.</span><br><br>
+<span class="plat">At T-5 seconds, the computer asks you with VERB 50 and NOUN XX to enable the engine: you reply with <B>ENTER</B>. Be ready for this one, as you don't have much time!</span><br><br>
+<span class="plat">At T=0 seconds, the computer starts the engine and you see that R3 now starts to count much faster. The R1 register now displays estimated time to engine shut down. When that happens, the computer shows you the error in delta v which you have to confirm with <B>VERB 33 ENTER</B>. Then it shows you the new apogee and perigee height plus the time till perigee. That you also confirm with <B>VERB 33 ENTER</B>. Finally the computer flashes V50N07, which is a request to change the program to something else. You can change to the idle program 0 with  <B>VERB 37 ENTER 00 ENTER</B>.</span><br><br>
+<span class="plat">That is it! You have now used the DSKY to change the orbit of the LM!</span><br><br>
+<!--END CONTENT-->
+
+</layer>
+</ilayer>
+
+<script language="JavaScript1.2">
+<!--
+if (iens6)
+{
+  document.write('</div></div>');
+  var crossobj=document.getElementById? document.getElementById("content") : document.all.content;
+  var contentheight=crossobj.offsetHeight;
+}
+else if (ns4)
+{
+  var crossobj=document.nscontainer.document.nscontent;
+  var contentheight=crossobj.clip.height;
+}
+
+function movedown()
+{
+  if (window.moveupvar) 
+    clearTimeout(moveupvar);
+  if (iens6&&parseInt(crossobj.style.top)>=(contentheight*(-1)+100))
+    crossobj.style.top=parseInt(crossobj.style.top)-speed;
+  else if (ns4&&crossobj.top>=(contentheight*(-1)+100))
+    crossobj.top-=speed;
+  movedownvar=setTimeout("movedown()",100);
+}
+
+function moveup()
+{
+  if (window.movedownvar) 
+    clearTimeout(movedownvar);
+  if (iens6&&parseInt(crossobj.style.top)<=0)
+    crossobj.style.top=parseInt(crossobj.style.top)+speed;
+  else if (ns4&&crossobj.top<=0)
+    crossobj.top+=speed;
+  moveupvar=setTimeout("moveup()",100);
+}
+
+function stopscroll()
+{
+  if (window.moveupvar) 
+     clearTimeout(moveupvar);
+  if (window.movedownvar) 
+     clearTimeout(movedownvar);
+}
+
+function movetop()
+{
+  stopscroll();
+  if (iens6)
+    crossobj.style.top=0;
+  else if (ns4)
+    crossobj.top=0;
+}
+
+function getcontent_height()
+{
+  if (iens6)
+    contentheight=crossobj.offsetHeight;
+  else if (ns4)
+    document.nscontainer.document.nscontent.visibility="show";
+}
+window.onload=getcontent_height;
+//-->
+</script>
+
+
+<SCRIPT LANGUAGE="JavaScript">
+<!--
+   StartTime();
+   ShowVNP(1);
+   ShowVNP(2);
+   ShowVNP(3);
+   HideReg(1);
+   HideReg(2);
+   HideReg(3);
+   //-->
+</script>
+</body>
+</html>
