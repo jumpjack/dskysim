@@ -1,10 +1,10 @@
-DSKYSIM - Simulator of DSKY interface of Apollo Guidance Computer
+**DSKYSIM - Simulator of DSKY interface of Apollo Guidance Computer**
 
 Original idea by Ron Noteborn, 2001.
 
 --------------------
 
-In 2022 I found by chance this tiny little page on internet:
+In 2022 I found by chance [http://apollo.spaceborn.dk/dsky-sim.html](this tiny) page on internet:
 
 ![image](https://user-images.githubusercontent.com/1620953/151132558-5482724c-248b-49eb-afa7-16bcde3f0528.png)
 
