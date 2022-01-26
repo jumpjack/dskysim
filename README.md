@@ -4,13 +4,13 @@ Original idea by Ron Noteborn, 2001.
 
 --------------------
 
-In 2022 I found by chance [http://apollo.spaceborn.dk/dsky-sim.html](this tiny) page on internet:
+In 2022 I found by chance [this tiny](http://apollo.spaceborn.dk/dsky-sim.html) page on internet:
 
 ![image](https://user-images.githubusercontent.com/1620953/151132558-5482724c-248b-49eb-afa7-16bcde3f0528.png)
 
 It's dated 2001, more than 20 years ago; probably github didn't even exist at that time. But that page and its source look very interesting: tiny, simple, completely standalone, and easily extensible with further functionalities.
 
-Original functionalities are indeed very simple, and summarized in the short help in the page itself, which you can find here.
+Original functionalities are indeed very simple, and summarized in the short help in the page itself, which you can find [here](https://github.com/jumpjack/dskysim/wiki/Original-help).
 
 But the exposed methods allow to easily interface the DSKY to any external javascript source.
 
