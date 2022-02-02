@@ -15,4 +15,4 @@ Original functionalities are indeed very simple, and summarized in the short hel
 But the exposed methods allow to easily interface the DSKY to any external javascript source, so I plan to write an "Apollo 11 LEM descent AGC replayer", which will replay status of lamps and registers of DSKY as recorded on july, 20th, 1969. Telemetries are available [here](http://www.ibiblio.org/apollo/Documents/apollo_11_computer_words.pdf) and I am trying to decode them [here](https://github.com/jumpjack/dskysim/wiki/Decoding-AGC-telemetries).
 
 
-I list in this page the highest level methods available to the developer; this is all you need to know to attach this interface to your program.
+I list in [this page](https://github.com/jumpjack/dskysim/wiki/Dskysim-methods) the highest level methods available to the developer; this is all you need to know to attach this interface to your program.
