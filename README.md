@@ -49,5 +49,8 @@ There are other projects showing "realtime" data for Apollo 11, mostrly focused 
 
 My repository [Apollo11LEMdata](https://github.com/jumpjack/Apollo11LEMdata), derived from the apparently abandoned [jamescarruthers/Apollo11LEMdata](https://github.com/jamescarruthers/Apollo11LEMdata) , contains all the telemetries charts I was able to find aorund in some documents "hidden" on several server around nthe world.
 
+# Other javascript AGC/DSKY simulators
+- [Moonjs](https://svtsim.com/moonjs/agc.html)
+- [iDSKY](http://idsky.genedorr.com/iDSKY.html)
 
 (*) "OUTPUT - EVERY 2 SECONDS 100 DOUBLE PRECISION WORDS (I.E. 200 LGC COMPUTER WORDS) ARE TRANSMITTED VIA DOWNLINK" --> see [original AGC source](https://github.com/virtualagc/virtualagc/blob/a9f2fd2d4c313497bbf98e80a0cbef0dc87faf09/LMY99R0/DOWN-TELEMETRY_PROGRAM.agc#L109)
