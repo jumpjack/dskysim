@@ -1,6 +1,12 @@
-**DSKYSIM - Simulator of DSKY interface of Apollo Guidance Computer**
+# DSKYSIM2  
 
-Original idea by Ron Noteborn, 2001.
+Replayer of Apollo 11 mission telemetries on DSKY interface of LEM Guidance Computer (LGC)**
+
+ - Live page: https://jumpjack.github.io/dskysim2/
+ - Raw telemetries in PDF: https://www.ibiblio.org/apollo/Documents/apollo_11_computer_words.pdf ([other link](https://archive.org/details/apollo_11_computer_words/mode/2up) , [raw imnages](https://ia802308.us.archive.org/view_archive.php?archive=/27/items/apollo_11_computer_words/apollo_11_computer_words_jp2.zip) )
+ - Transcripted telemetries: see .js files
+
+(Original idea of dskysim by Ron Noteborn, 2001).
 
 --------------------
 
