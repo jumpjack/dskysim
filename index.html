@@ -1,0 +1,1771 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+   <meta name="Author" content="Ron Noteborn">
+   <title>DSKY Simulator</title>
+   <link rel="stylesheet" type="text/css" name="mystyle"  href="ronstyle.css">
+<STYLE type=text/css>
+<!--
+#ElDSKY {
+	LEFT: 0px; POSITION: absolute; BACKGROUND:#000000; TOP: 10px; WIDTH: 1350px; HEIGHT:368px; Z-INDEX: 1;
+}
+
+//-->
+</STYLE>
+<script src="verbs.js"></script>
+<script src="flagwords.js"></script>
+<script src="channels.js"></script>
+<script src="registers.js"></script>
+<script src="verb_noun_prog.js"></script>
+<script src="timeline.js"></script>
+
+
+<SCRIPT LANGUAGE="JavaScript">
+   <!--
+
+// 0.0.3: Implemented reading of register, flagwords and channels and connection to DSKY
+// 0.0.2: Implemented reading of telemetries
+// version 0.0.1: First with display ready to be fully controlled
+
+	// Official timeline: https://history.nasa.gov/SP-4029/Apollo_11i_Timeline.htm
+	// liftoff time (Mission time 00:00:00): "1969-07-16 13:32:00Z" (GMT), 08:32 local
+	// data start time: 102:31:25 Mission Time, or liftoff + 04d 06h 31m 25s
+	LIFTOFF_TIME = new Date("1969-07-16 13:32:00Z");
+	DATA_START_TIME = 		new Date(LIFTOFF_TIME.getTime() + 4 * 86400*1000 + 6 * 3600 *1000 + 31 * 60 *1000  + 25*1000 );  // 20:03 local
+	TOUCHDOWN_TIME =  	new Date(LIFTOFF_TIME.getTime() + 4 * 86400*1000 + 6 * 3600 *1000 + 45 * 60 *1000  + 41*1000 );  // 20:17 local
+	console.log(LIFTOFF_TIME.toUTCString());
+	console.log(DATA_START_TIME.toUTCString());
+	console.log(TOUCHDOWN_TIME.toUTCString());
+
+    TIMESTEP = 1000; // debug: 1000
+
+   NS4 = (document.layers) ? 1 : 0;
+   IE4 = (document.all) ? 1 : 0;
+   ver4 = (NS4 || IE4) ? 1 : 0;
+
+   InitialTimeToGo=5; //MINUTES
+   CA=0;
+
+   REGISTER1=0;    
+   REGISTER2=0;
+   REGISTER3=0;
+
+   VERB=-1;
+   NOUN=-1;
+   PROG=34;
+   ERROR=0;
+  
+   R1P=-1;
+   R11=-1;
+   R12=-1;
+   R13=-1;
+   R14=-1;
+   R15=-1;
+
+   R2P=-1;
+   R21=-1;
+   R22=-1;
+   R23=-1;
+   R24=-1;
+   R25=-1;
+
+   R3P=-1;
+   R31=-1;
+   R32=-1;
+   R33=-1;
+   R34=-1;
+   R35=-1;
+
+   V1=-1;
+   V2=-1;
+   N1=-1;
+   N2=-1;
+
+   KeyBoardState=0;
+   ProgState=0;
+   WaitingForAuthorisation=0;
+   WaitingForPerform=0;
+
+   Flashing=0;
+   DisplayingNoun=-1;
+   ChangingProgram=0;
+   CompStartTime=0;
+   LGCTime=0;
+
+   EventTime=0
+   TimeToEvent=0;
+   DeltaV=0;
+   DeltaVAchieved=0;
+   Ullage=0;
+   EngineOn=0;
+   UllageAcc=0.1;
+   EngineAcc=1;
+   TimeUpdatePeriod=100;
+   LastUpdateLGCTime=-1;
+
+   NumRegistersToLoad=0;
+   RegisterLoading=0;
+   DigitLoading=0;
+   IsOctal=1;
+
+
+	TMtime = 369685; // Telemetry time
+
+   function ChangeImageOnDiv(ElId,imgid,name)
+   {
+     if (NS4) 
+       eval("document."+ElId+".document.images['"+imgid+"'].src='"+name+"';");
+     else 
+       document.images[imgid].src=name;
+   }   
+
+   function DisplayDigit(dig, image)
+   { 
+     if (dig<0)
+       ChangeImageOnDiv('ElDSKY',image,'digit-off.jpg');
+     else if (dig==0)
+       ChangeImageOnDiv('ElDSKY',image,'digit0.jpg');
+     else if (dig==1)
+       ChangeImageOnDiv('ElDSKY',image,'digit1.jpg');
+     else if (dig==2)
+       ChangeImageOnDiv('ElDSKY',image,'digit2.jpg');
+     else if (dig==3)
+       ChangeImageOnDiv('ElDSKY',image,'digit3.jpg');
+     else if (dig==4)
+       ChangeImageOnDiv('ElDSKY',image,'digit4.jpg');
+     else if (dig==5)
+       ChangeImageOnDiv('ElDSKY',image,'digit5.jpg');
+     else if (dig==6)
+       ChangeImageOnDiv('ElDSKY',image,'digit6.jpg');
+     else if (dig==7)
+       ChangeImageOnDiv('ElDSKY',image,'digit7.jpg');
+     else if (dig==8)
+       ChangeImageOnDiv('ElDSKY',image,'digit8.jpg');
+     else if (dig==9)
+       ChangeImageOnDiv('ElDSKY',image,'digit9.jpg');
+     else if (dig==10)
+       ChangeImageOnDiv('ElDSKY',image,'plusmin-off.jpg');
+     else if (dig==11)
+       ChangeImageOnDiv('ElDSKY',image,'plusmin-min.jpg');
+     else if (dig==12)
+       ChangeImageOnDiv('ElDSKY',image,'plusmin-plus.jpg');
+   }
+
+   function DrawReg(R, dig0, dig1, dig2, dig3, dig4, dig5)
+   {
+     if (R==1) 
+     {
+       DisplayDigit(dig0, 'R1PM'); 
+       DisplayDigit(dig1, 'R1D1'); 
+       DisplayDigit(dig2, 'R1D2'); 
+       DisplayDigit(dig3, 'R1D3'); 
+       DisplayDigit(dig4, 'R1D4'); 
+       DisplayDigit(dig5, 'R1D5'); 
+     }
+     else if (R==2)
+     {
+       DisplayDigit(dig0, 'R2PM'); 
+       DisplayDigit(dig1, 'R2D1'); 
+       DisplayDigit(dig2, 'R2D2'); 
+       DisplayDigit(dig3, 'R2D3'); 
+       DisplayDigit(dig4, 'R2D4'); 
+       DisplayDigit(dig5, 'R2D5'); 
+     }
+     else if (R==3)
+     {
+       DisplayDigit(dig0, 'R3PM'); 
+       DisplayDigit(dig1, 'R3D1'); 
+       DisplayDigit(dig2, 'R3D2'); 
+       DisplayDigit(dig3, 'R3D3'); 
+       DisplayDigit(dig4, 'R3D4'); 
+       DisplayDigit(dig5, 'R3D5'); 
+     }
+   }
+
+   function HideReg(R)
+   {
+     DrawReg(R,10,-1,-1,-1,-1,-1);  
+   }
+
+   function ShowRegDecimal(R)
+   {
+     if (R==1)
+       num=REGISTER1;
+     else if (R==2)
+       num=REGISTER2;
+     else if (R==3)
+       num=REGISTER3;
+
+     if (num<0)
+     {
+       dig0=11;
+       num=-num;
+     }
+     else
+       dig0=12;     
+     dig1=Math.floor(num/10000);
+     num=num-dig1*10000;
+     if (dig1>9) 
+       dig1=9;
+     dig2=Math.floor(num/1000);
+     num=num-dig2*1000;
+     dig3=Math.floor(num/100);
+     num=num-dig3*100;
+     dig4=Math.floor(num/10);
+     num=num-dig4*10;
+     dig5=Math.floor(num);
+
+     DrawReg(R, dig0, dig1, dig2, dig3, dig4, dig5);
+   }   
+
+   function ShowRegOctal(R)
+   {
+     if (R==1)
+       num=REGISTER1;
+     else if (R==2)
+       num=REGISTER2;
+     else if (R==3)
+       num=REGISTER3;
+
+     dig0=10;     
+     if (num<0)
+     {
+       dig1=-1;
+       dig2=-1;
+       dig3=-1;
+       dig4=-1;
+       dig5=-1;
+     }
+     else
+     {
+        dig1=Math.floor(num/10000);
+        num=num-dig1*10000;
+        if (dig1>9) 
+          dig1=9;
+        dig2=Math.floor(num/1000);
+        num=num-dig2*1000;
+        dig3=Math.floor(num/100);
+        num=num-dig3*100;
+        dig4=Math.floor(num/10);
+        num=num-dig4*10;
+        dig5=Math.floor(num);
+     } 
+     DrawReg(R, dig0, dig1, dig2, dig3, dig4, dig5);
+   }   
+  
+
+   function ShowRegMinSec(R, Time)
+   {
+     if (Time<0)
+       dig0=11;     
+     else
+       dig0=12;
+     Time=Math.abs(Time);
+     Min=Math.floor(Time/60);
+     Sec=Math.floor(Time-Min*60);
+
+
+     dig1=Math.floor(Min/10);
+     Min=Min-dig1*10;
+     if (dig1>9)
+       dig1=9;
+     dig2=Math.floor(Min);
+     dig3=-1; 
+     dig4=Math.floor(Sec/10);
+     Sec=Sec-dig4*10;
+     if (dig4>9)
+       dig4=9;
+     dig5=Math.floor(Sec);
+
+     DrawReg(R, dig0, dig1, dig2, dig3, dig4, dig5);
+   }   
+
+
+function ShowRegDoubleValue(R,stringValue) {
+	if ( stringValue.substr(0,1) != "-") {
+		dig0 = 12;
+		dig1 = stringValue.substr(0,1);
+		dig2 = stringValue.substr(1,1);
+		dig3 = -1;
+		dig4 = stringValue.substr(3,1);
+		dig5 = stringValue.substr(4,1);
+	} else {
+		dig0 = 11;
+		dig1 = stringValue.substr(1,1);
+		dig2 = stringValue.substr(2,1);
+		dig3 = -1;
+		dig4 = stringValue.substr(4,1);
+		dig5 = stringValue.substr(5,1);
+	}
+    DrawReg(R, dig0, dig1, dig2, dig3, dig4, dig5);
+}
+
+
+   function DrawVNP(id, dig1, dig2)
+   {
+     if (id==1)
+     {
+       DisplayDigit(dig1, 'V1'); 
+       DisplayDigit(dig2, 'V2'); 
+     }
+     else if (id==2)
+     {
+       DisplayDigit(dig1, 'N1'); 
+       DisplayDigit(dig2, 'N2'); 
+     }
+     else if (id==3)
+     {
+       DisplayDigit(dig1, 'P1'); 
+       DisplayDigit(dig2, 'P2'); 
+     }
+   }
+
+   function HideVNP(id)
+   {
+     DrawVNP(id, -1,-1);
+   }
+
+   function ShowVNP(id)
+   {
+     if (id==1)
+       num=VERB;
+     else if (id==2)
+       num=NOUN;
+     else if (id==3)
+       num=PROG;
+
+     if (num<0)
+     {
+       dig1=-1;
+       dig2=-1;
+     }
+     else
+     {
+       dig1=Math.floor(num/10);
+       dig2=Math.floor(num-dig1*10);
+     }
+     DrawVNP(id, dig1,dig2);
+   }
+
+
+   function doNothing(){}
+
+   function ErrorFunction() 
+   {}
+
+   function FlashOff()
+   {     
+     if (Flashing>0)
+     {
+       if ((Flashing&1)==1) 
+         HideVNP(1);
+       if ((Flashing&2)==2) 
+         HideVNP(2);
+       //setTimeout('FlashOn()',500);
+     }
+     else
+     {
+       ShowVNP(1);
+       ShowVNP(2); 
+     }
+   }
+
+   function FlashOn()
+   { 
+     if (Flashing>0)
+     {
+       if ((Flashing&1)==1) 
+         ShowVNP(1);
+       if ((Flashing&2)==2) 
+         ShowVNP(2);
+       //setTimeout('FlashOff()',500);
+     }
+   }
+ 
+   function StartFlashing(Mode)
+   {
+     if (Flashing!=0)
+       Flashing=Mode;
+     else
+     {
+       Flashing=Mode;
+       FlashOn();
+     }
+   }
+
+   
+ 
+   function UpdateVN()
+   {
+     ERROR=0;
+     if ((V1==-1) | (V2==-1))
+       ERROR=1;
+     else
+     {
+       VERB=V1*10+V2;
+       ShowVNP(1);
+       if ((N1==-1) | (N2==-1))
+         ERROR=1;
+       else
+       {
+         NOUN=N1*10+N2;
+         ShowVNP(2);
+       }
+     }
+   }
+
+   function Alarm(alid)
+   {
+     VERB=50;
+     NOUN=31;
+     REGISTER1=alid;
+     ShowVNP(1);
+     ShowVNP(2);
+     ShowRegOctal(1);
+     HideReg(2);
+     HideReg(3);
+     ERROR=alid;
+     StartFlashing(3);
+   }
+
+   function OperatorError()
+   {
+     
+   }
+
+  function DisplayTime(T)
+   {
+        Hrs=Math.floor(T/3600);
+        T=T-Hrs*3600;
+        Min=Math.floor(T/60);
+        T=T-Min*60;
+        Sec=Math.floor(T);
+        T=T-Sec;
+        FSec=Math.floor(T*100);
+
+        dig0=10;     
+        dig1=0;
+        dig2=0;
+        dig3=Math.floor(Hrs/100);
+        Hrs=Hrs-dig3*100;
+        dig4=Math.floor(Hrs/10);
+        Hrs=Hrs-dig4*10;
+        dig5=Math.floor(Hrs);
+        DrawReg(1, 10,0,0, dig3, dig4, dig5);
+
+        dig4=Math.floor(Min/10);
+        Min=Min-dig4*10;
+        dig5=Math.floor(Min);
+        DrawReg(2, 10, 0,0,0, dig4, dig5);
+
+        dig2=Math.floor(Sec/10);
+        Sec=Sec-dig2*10;
+        dig3=Math.floor(Sec);
+        dig4=Math.floor(FSec/10);
+        FSec=FSec-dig4*10;
+        dig5=Math.floor(FSec);
+        DrawReg(3, 10,0, dig2, dig3, dig4, dig5);
+   }  
+
+   function ChangeProgram(id)
+   {
+		PROG = id;
+       ShowVNP(3);
+       ProgState=0;
+       Flashing=0;
+       DisplayingNoun=0;
+       WaitingForAuthorisation=0; 
+       WaitingForPerform=0;
+       //RunProgram40();
+
+   }
+
+  
+   function ProcessRequest()
+   {
+     HideVNP(1);
+     HideVNP(2);
+     UpdateVN();
+
+	explainVerbNoun();
+
+     if ((VERB==0) | ((NOUN==0) & (VERB!=37)))
+       OperatorError();
+     else if (VERB==25)
+     {
+        //Load 3 components of ...
+        DisplayingNoun=-1;
+        KeyBoardState=10;
+        DigitLoading=0;
+        RegisterLoading=1;
+        NumRegistersToLoad=3; 
+        VERB=21;
+        ShowVNP(1);
+        Flashing=3;
+        FlashOn();
+        REGISTER1=-1;  R1P=10;R11=-1;R12=-1;R13=-1;R14=-1;R15=-1;
+        REGISTER2=-1;  R2P=10;R21=-1;R22=-1;R23=-1;R24=-1;R25=-1;
+        REGISTER3=-1;  R3P=10;R31=-1;R32=-1;R33=-1;R34=-1;R35=-1;
+        DrawReg(1, R1P, R11, R12, R13, R14, R15);
+        DrawReg(2, R2P, R21, R22, R23, R24, R25);
+        DrawReg(3, R3P, R31, R32, R33, R34, R35);
+     }
+     else if (VERB==33)
+     {
+       //PROCEED WITHOUT DATA
+       WaitingForAuthorisation=0;
+       WaitingForPerform=0;
+       Flashing=0;
+     }
+     else if (VERB==34)
+     {
+       //TERMINATION  
+       ChangingProgram=0;
+       Flashing=0;
+       HideReg(1);
+       HideReg(2);
+       HideReg(3);
+       HideVNP(1);
+       HideVNP(2);
+       ChangeProgram(0);
+       Flashing=0; 
+     }
+     else if (VERB==37)
+     {
+       if (ChangingProgram==0)
+       {
+         NOUN=-1;
+         N1=-1;
+         N2=-1;
+         DrawVNP(2,N1,N2);
+         StartFlashing(1);
+         ChangingProgram=1;
+         KeyBoardState=2;
+       }
+       else
+       {
+         ChangingProgram=0;
+         Flashing=0;
+         ChangeProgram(NOUN);
+       }
+     }
+     else if ((VERB==5) | (VERB==6))
+     {
+       if (NOUN==65)
+       {
+         DisplayingNoun=65;
+         DisplayNoun65();
+         DisplayingNoun=-1;
+       }
+       else if (NOUN==40)
+       {
+         DisplayingNoun=40;
+         DisplayNoun40();
+         DisplayingNoun=-1;
+       }
+       else if (NOUN==34)
+       // EVENT TIME
+       {
+         DisplayingNoun=34;
+         DisplayNoun34();
+         DisplayingNoun=-1;
+       }
+       else if (NOUN==35)
+       // DELTA EVENT TIME
+       {
+         DisplayingNoun=35;
+         DisplayNoun35();
+         DisplayingNoun=-1;
+       }
+     }
+     else if ((VERB==15) | (VERB==16))
+     {
+       if (NOUN==65)
+       {
+         DisplayingNoun=65;
+         DisplayNoun65();
+       }
+       else if (NOUN==40)
+       {
+         DisplayingNoun=40;
+         DisplayNoun40();
+       }
+       else if (NOUN==34)
+       // EVENT TIME
+       {
+         DisplayingNoun=34;
+         DisplayNoun34();
+       }
+       else if (NOUN==35)
+       // DELTA EVENT TIME
+       {
+         DisplayingNoun=35;
+         DisplayNoun35();
+       }
+     }
+   }
+
+/*
+   function RSETKeyPressed()
+   { 
+     if (ERROR!=0)
+     {
+       ERROR=0;
+       Flashing=0; 
+       HideReg(1);
+       HideReg(2);
+       HideReg(3);
+       HideVNP(1);
+       HideVNP(2);
+     }
+   }
+
+*/
+
+/*
+   function ProcessRegisterEntry(Key)
+   {
+     if (RegisterLoading==0)
+       return;
+
+     // process key for loading data
+     if (Key==23)
+     {
+       //CLEAR KEY
+       if (DigitLoading>0)
+       {
+         DigitLoading=0;
+         if (RegisterLoading==1)
+           IsOctal=1;
+         if (RegisterLoading==1)
+         {
+           REGISTER1=-1;  R1P=10;R11=-1;R12=-1;R13=-1;R14=-1;R15=-1;
+           DrawReg(1, R1P, R11, R12, R13, R14, R15);
+           VERB=21;
+         }
+         else if (RegisterLoading==2)
+         {
+           REGISTER2=-1;  R2P=10;R21=-1;R22=-1;R23=-1;R24=-1;R25=-1;
+           DrawReg(2, R2P, R21, R22, R23, R24, R25);
+           VERB=22;
+         }
+         else if (RegisterLoading==3)
+         {
+           REGISTER3=-1;  R3P=10;R31=-1;R32=-1;R33=-1;R34=-1;R35=-1;
+           DrawReg(3, R3P, R31, R32, R33, R34, R35);
+           VERB=23;
+         }
+       }
+       else
+       {
+         RegisterLoading=RegisterLoading-1;
+         if (RegisterLoading==0)
+           RegisterLoading=1;
+         else
+         {
+           if (RegisterLoading==1)
+           {
+             REGISTER1=-1;  R1P=10;R11=-1;R12=-1;R13=-1;R14=-1;R15=-1;
+             DrawReg(1, R1P, R11, R12, R13, R14, R15);
+             VERB=21;
+           }
+           else if (RegisterLoading==2)
+           {
+             REGISTER2=-1;  R2P=10;R21=-1;R22=-1;R23=-1;R24=-1;R25=-1;
+             DrawReg(2, R2P, R21, R22, R23, R24, R25);
+             VERB=22;
+           }
+           else if (RegisterLoading==3)
+           {
+             REGISTER3=-1;  R3P=10;R31=-1;R32=-1;R33=-1;R34=-1;R35=-1;
+             DrawReg(3, R3P, R31, R32, R33, R34, R35);
+             VERB=23; 
+           }
+         }
+       }
+     }
+
+     else if ((Key==20) | (Key==21))
+     // PLUS AND MINUS
+     {
+       if ((DigitLoading==0) & (RegisterLoading==1))
+       {
+         IsOctal=0;
+         if (Key==20)
+           R1P=12;
+         else
+           R1P=11;
+         DrawReg(1,R1P,R11,R12,R13,R14,R15); 
+       }
+       else
+       if ((DigitLoading==0) & (IsOctal==0))
+       {
+         if (RegisterLoading==2)
+         {
+           if (Key==20)
+             R2P=12;
+           else
+             R2P=11;
+           DrawReg(2,R2P,R21,R22,R23,R24,R25); 
+         }
+         else if (RegisterLoading==3)
+         {
+           if (Key==20)
+             R3P=12;
+           else
+             R3P=11;
+           DrawReg(3,R3P,R31,R32,R33,R34,R35); 
+         }
+       }   
+     }
+
+     // KEYS 8 AND 9 only allowed in decimal mode
+     else if (((Key==8) | (Key==9)) & (IsOctal==1))
+       OperatorError();
+
+     // ENTER KEY (decimals need 5 digits plus sign)
+     else if (Key==12)
+     {
+       if (IsOctal==0)
+       {
+         if (DigitLoading<=5)
+         {
+           OperatorError();
+           return;
+         }
+       }
+       //next register
+       DigitLoading=0;
+       RegisterLoading=RegisterLoading+1;
+       if (RegisterLoading>NumRegistersToLoad)
+       {
+         KeyBoardState=0;
+         RegisterLoading=0;
+         Flashing=0;
+         HideReg(1);
+         HideReg(2);
+         HideReg(3);
+         WaitingForAuthorisation=0;
+       }
+       else
+         VERB=VERB+1;
+     }
+     else
+
+     // KEYS 0 to 9
+     {
+       if (IsOctal==0)
+       {
+         if (((RegisterLoading==2) & (R2P==10)) |
+             ((RegisterLoading==3) & (R3P==10)) )
+         {
+           ErrorFunction();
+           return;
+         }
+       }
+       if (RegisterLoading==1)
+       { 
+         if ((DigitLoading==0) | (DigitLoading==1))
+         {
+           R11=Key;
+           DigitLoading=1; 
+         }
+         else if (DigitLoading==2)
+           R12=Key;
+         else if (DigitLoading==3)
+           R13=Key;
+         else if (DigitLoading==4)
+           R14=Key;
+         else if (DigitLoading==5)
+           R15=Key;
+         DrawReg(1,R1P,R11,R12,R13,R14,R15); 
+         DigitLoading=DigitLoading+1;
+       }
+       else if (RegisterLoading==2)
+       { 
+         if ((DigitLoading==0) | (DigitLoading==1))
+         {
+           R21=Key;
+           DigitLoading=1; 
+         }
+         else if (DigitLoading==2)
+           R22=Key;
+         else if (DigitLoading==3)
+           R23=Key;
+         else if (DigitLoading==4)
+           R24=Key;
+         else if (DigitLoading==5)
+           R25=Key;
+         DrawReg(2,R2P,R21,R22,R23,R24,R25); 
+         DigitLoading=DigitLoading+1;
+       }
+       else if (RegisterLoading==3)
+       { 
+         if ((DigitLoading==0) | (DigitLoading==1))
+         {
+           R31=Key;
+           DigitLoading=1; 
+         }
+         else if (DigitLoading==2)
+           R32=Key;
+         else if (DigitLoading==3)
+           R33=Key;
+         else if (DigitLoading==4)
+           R34=Key;
+         else if (DigitLoading==5)
+           R35=Key;
+         DrawReg(3,R3P,R31,R32,R33,R34,R35); 
+         DigitLoading=DigitLoading+1;
+       }
+     }       
+   }
+*/
+
+/*
+   function PressedKey(Key)
+   {    
+     if (Key==10)
+     // VERB
+     {
+        KeyBoardState=1;
+        Flashing=0;
+        V1=-1;
+        V2=-1;
+        VERB=-1; 
+        ShowVNP(1);  
+     }
+     else if (Key==11)
+     // NOUN
+     {
+        KeyBoardState=2;
+        Flashing=0;
+        N1=-1;
+        N2=-1;
+        NOUN=-1;
+        ShowVNP(2);
+     }
+     else if (Key==12)
+     // ENTER 
+     { 
+       if (WaitingForPerform==1)
+       {
+         WaitingForPerform=0;
+         Flashing=0;
+         VERB=-1;
+         NOUN=-1;
+         ShowVNP(1);
+         ShowVNP(2);
+       }
+       else if ((KeyBoardState==1) | (KeyBoardState==2)) 
+       {
+         KeyBoardState=0;
+         ProcessRequest();  
+       }
+       else
+         ProcessRegisterEntry(Key);
+     }
+     else if (Key==24)
+     // RSET
+       RSETKeyPressed();
+     else if (Key==23)
+     {
+       if (KeyBoardState==10)
+         ProcessRegisterEntry(Key);
+     }
+     else if ((Key>=0) & (Key<=9))
+     {
+       if (KeyBoardState==1)
+       {
+         if ((Key==8) | (Key==9))
+            ErrorFunction();
+         else
+         if (V1<0)
+           V1=Key;
+         else if (V2<0)
+           V2=Key;
+         DrawVNP(1, V1,V2);
+       }
+       else
+       if (KeyBoardState==2)
+       {
+         if ((Key==8) | (Key==9))
+            ErrorFunction();
+         else
+         if (N1<0)
+           N1=Key;
+         else if (N2<0)
+           N2=Key;
+         DrawVNP(2, N1,N2);
+       }
+       else if (KeyBoardState==10)
+         ProcessRegisterEntry(Key);
+     }
+     else if ((Key==20) | (Key==21))
+     {
+        if (KeyBoardState==10)
+          ProcessRegisterEntry(Key);
+     }
+   }
+
+*/
+
+   function FlashActy()
+   {
+     if (CA==0)     
+     {
+       ChangeImageOnDiv('ElDSKY','COMPACTY',"dsky-compacty-on.jpg");
+       CA=1;
+       //setTimeout('FlashActy()',Math.floor(Math.random()*200));
+     }
+     else
+     {
+       ChangeImageOnDiv('ElDSKY','COMPACTY',"dsky-compacty-off.jpg");
+       CA=0;
+       //setTimeout('FlashActy()',Math.floor(Math.random()*3500));
+
+     }
+
+	readTelemetries();
+    TMtime++;
+   }
+
+
+
+	function readTelemetries() {
+		console.log("Must read telemetries for time " + TMtime);
+        updateMissionTime(TMtime);
+        flagwordCount = 0;
+		channelCount = 0;
+        registerCount = 0;
+        VNPCount = 0;
+
+		// Parse all flagwords, to scan telemetries for each one:
+		flagwords.forEach ( flagword => {
+			const res = flagword.values.find(x => x.time === TMtime)?.value // Find telemetries for this flagword for current mission time
+			if (res) { // Telemetry found for current time: scan all lamps
+//console.log("Found telemetry for flagword n." + flagwordCount + " at time " + TMtime + ": " +res);				//if (res != null) {
+                var bits = res;
+				LAMPS.forEach(lampRow => {
+					if(lampRow[0].flagword != null) {
+						if (lampRow[0].flagword.index === flagwordCount) {
+// console.log("Tempo " + TMtime + ", Trovata lampada 1: " + lampRow[0].id + ", flagword " + flagwordCount + ", bit: " + lampRow[0].flagword.bit, bits, bits[lampRow[0].flagword.bit]);
+						turnLampOnOff(lampRow[0].id, bits[lampRow[0].flagword.bit]);
+						}
+					}
+
+					if(lampRow[1].flagword != null) {
+						if (lampRow[1].flagword.index === flagwordCount) {
+//console.log("Trovata lampada 2: " + lampRow[1].id + ", flagword " + flagwordCount);
+						turnLampOnOff(lampRow[1].id, bits[lampRow[1].flagword.bit]);
+						}
+					}
+				}
+				);
+			}
+			flagwordCount++;
+		}
+		);
+
+		// Parse all channels, to scan telemetries for each one:
+		channels.forEach ( channel => {
+			const res = channel.values.find(x => x.time === TMtime)?.value // Find telemetries for this flagword for current mission time
+			if (res) {
+console.log("Found telemetry for channel n." + channelCount + " at time " + TMtime + ": " +res);
+                var bits = res;
+				LAMPS.forEach(lampRow => {
+//console.log("Analysing LampRow left:" , lampRow[0]);
+//console.log("Analysing LampRow right:" , lampRow[1]);
+					if(lampRow[0].channel != null) {
+						if (lampRow[0].channel.index === channelCount) {
+console.log("Tempo " + TMtime + ", Trovata lampada sinistra: " + lampRow[0].id + ", canale " + channelCount + ", bit: " + lampRow[0].channel.bit, bits, bits[lampRow[0].channel.bit]);
+						turnLampOnOff(lampRow[0].id, bits[lampRow[0].channel.bit]);
+						}
+					}
+
+					if(lampRow[1].channel != null) {
+						if (lampRow[1].channel.index === channelCount) {
+console.log("Tempo " + TMtime + ", Trovata lampada destra: " + lampRow[1].id + ", canale " + channelCount + ", bit: " + lampRow[1].channel.bit, bits, bits[lampRow[1].channel.bit]);
+						turnLampOnOff(lampRow[1].id, bits[lampRow[1].channel.bit]);
+						}
+					}
+
+				}
+				);
+			}
+			channelCount++;
+		}
+		);
+
+
+		// Parse all registers, to scan telemetries for each one:
+		registers.forEach ( register => {
+			const res = register.values.find(x => x.time === TMtime)?.value // Find telemetries for this register for current mission time
+			if (res) {
+console.log("Found telemetry for register n." + registerCount + " at time " + TMtime + ": " +res);
+                var registerValue = res;
+				if (registerCount > 0) { // register 0 is not used
+					if (registerCount === 1) {
+						if ((registerValue.toUpperCase().indexOf("B") < 0) && (registerValue.toUpperCase().indexOf(" ") < 0)) {
+							REGISTER1 = registerValue*1;
+console.log("Impostare registro n." + registerCount + " a " + registerValue*1);
+		                    ShowRegDecimal(registerCount);
+						} else {
+console.log("REGISTRO 1 con B")
+                            ShowRegDoubleValue(1,registerValue);
+						}
+					}
+
+					if (registerCount === 2) {
+						if ((registerValue.toUpperCase().indexOf("B") < 0) && (registerValue.toUpperCase().indexOf(" ") < 0) ){
+							REGISTER2 = registerValue*1;
+console.log("Impostare registro n." + registerCount + " a " + registerValue*1);
+		                    ShowRegDecimal(registerCount);
+						} else {
+console.log("REGISTRO 2 con B")
+                            ShowRegDoubleValue(2,registerValue);
+						}
+					}
+
+
+					if (registerCount === 3) {
+						if (registerValue.toUpperCase().indexOf("B") < 0) {
+							REGISTER3 = registerValue*1;
+console.log("Impostare registro n." + registerCount + " a " + registerValue*1);
+		                    ShowRegDecimal(registerCount);
+						} else {
+console.log("REGISTRO 3 con B")
+                            ShowRegDoubleValue(3,registerValue);
+						}
+					}
+
+				}
+
+			}
+			registerCount++;
+		}
+		);
+
+		VERB = 0; NOUN = 0; PROG = 0;
+        res = VNPs.find(x => x.time === TMtime)?.verb // Find telemetries for this verb-noun-prog triplet for current mission time
+		if (res)
+			VERB = res;
+		else
+			VERB = -1;
+		ShowVNP(1);
+
+        res = VNPs.find(x => x.time === TMtime)?.noun // Find telemetries for this verb-noun-prog triplet for current mission time
+		if (res)
+			NOUN = res;
+		else
+			NOUN = -1;
+		ShowVNP(2);
+
+        res = VNPs.find(x => x.time === TMtime)?.prog // Find telemetries for this verb-noun-prog triplet for current mission time
+		if (res)
+			PROG = res;
+		else
+			VERPROGB = -1;
+		ShowVNP(3);
+
+        explainVerbNoun();
+
+	}
+
+   function UpdateLGCTime()
+   {
+     var Digital=new Date();
+     var hours=Digital.getHours();
+     var minutes=Digital.getMinutes();
+     var seconds=Digital.getSeconds();
+     var mseconds=Digital.getMilliseconds();
+     CompCurrentTime=hours*3600+minutes*60+seconds+mseconds/1000;
+     ElapsedTime=CompCurrentTime-CompStartTime;
+     LGCTime=/*100*3600+20*60+15+0.45 + */ElapsedTime;
+   }
+
+   function UpdateTime()
+   {
+//console.log(ElapsedTime);
+     UpdateLGCTime();
+     if (LastUpdateLGCTime>=0)
+       UpdatePeriodElapsed=LGCTime-LastUpdateLGCTime; 
+     else
+       UpdatePeriodElapsed=0;
+     LastUpdateLGCTime=LGCTime; 
+
+     TimeToEvent=LGCTime-EventTime; 
+
+     if (Ullage==1)
+       DeltaVAchieved=DeltaVAchieved+UllageAcc*(UpdatePeriodElapsed);
+     if (EngineOn==1)
+       DeltaVAchieved=DeltaVAchieved+EngineAcc*(UpdatePeriodElapsed);
+    
+     setTimeout('UpdateTime()',TimeUpdatePeriod);
+   }
+   
+   function StartTime()
+   {  
+     var Digital=new Date();
+     var hours=Digital.getHours();
+     var minutes=Digital.getMinutes();
+     var seconds=Digital.getSeconds();
+     var mseconds=Digital.getMilliseconds();
+     CompStartTime=hours*3600+minutes*60+seconds+mseconds/1000;
+     UpdateLGCTime();
+     EventTime=LGCTime+InitialTimeToGo*60;
+     DeltaV=70;
+     setTimeout('UpdateTime()',250);
+     setInterval('FlashActy()',TIMESTEP);
+   }
+
+  ExplanationOpenNow=0;
+
+function explainVerbNoun() {
+	if (VERB>0)
+		document.getElementById("spnVerbExplain").innerHTML = dictio.verbs[VERB].number + " - " +  dictio.verbs[VERB].description  + " - " +  dictio.verbs[VERB].notes;
+
+	if (NOUN>0)
+		document.getElementById("spnNounExplain").innerHTML = dictio.nouns[NOUN].number + " - " +  dictio.nouns[NOUN].description + " - " +  dictio.nouns[NOUN].components  + " - " +  dictio.nouns[NOUN].scale  + " - " +  dictio.nouns[NOUN].notes_org  + " - " +  dictio.nouns[NOUN].notes;
+
+	if (PROG>0)
+		document.getElementById("spnProgExplain").innerHTML = "n/a"; // dictio.progs[PROG].number + " - " +  dictio.progs[PROG].description;
+}
+
+function fillTableVerbs() {
+	tblVerbs = document.createElement("table");
+	tblVerbs.setAttribute("border",1);
+
+	row = document.createElement("TR");
+	cell = document.createElement("TD");
+    cell.setAttribute("colspan",3);
+	cell.innerHTML = "VERBS";
+	row.appendChild(cell);
+    tblVerbs.appendChild(row);
+
+	row = document.createElement("TR");
+	cell = document.createElement("TD");
+	cell.innerHTML = "N";
+	row.appendChild(cell);
+
+	cell = document.createElement("TD");
+	cell.innerHTML = "Description";
+	row.appendChild(cell);
+
+	cell = document.createElement("TD");
+	cell.innerHTML = "Notes";
+	row.appendChild(cell);
+
+	tblVerbs.appendChild(row);
+
+	for (var v = 0; v< dictio.verbs.length; v++) {
+		row = document.createElement("TR");
+		cell = document.createElement("TD");
+		cell.innerHTML = dictio.verbs[v].number
+		row.appendChild(cell);
+
+		cell = document.createElement("TD");
+		cell.innerHTML = dictio.verbs[v].description
+		row.appendChild(cell);
+
+		cell = document.createElement("TD");
+		cell.innerHTML = dictio.verbs[v].notes
+		row.appendChild(cell);
+
+		tblVerbs.appendChild(row);
+	}
+    document.getElementById("reftab").appendChild(tblVerbs);
+}
+
+function fillTableNouns() {
+	tblNouns = document.createElement("table");
+	tblNouns.setAttribute("border",1);
+
+	row = document.createElement("TR");
+	cell = document.createElement("TD");
+    cell.setAttribute("colspan",3);
+	cell.innerHTML = "NOUNS";
+	row.appendChild(cell);
+    tblNouns.appendChild(row);
+
+	row = document.createElement("TR");
+	cell = document.createElement("TD");
+	cell.innerHTML = "N";
+	row.appendChild(cell);
+
+	cell = document.createElement("TD");
+	cell.innerHTML = "Description";
+	row.appendChild(cell);
+
+	cell = document.createElement("TD");
+	cell.innerHTML = "Components";
+	row.appendChild(cell);
+
+	cell = document.createElement("TD");
+	cell.innerHTML = "Scale";
+	row.appendChild(cell);
+
+	cell = document.createElement("TD");
+	cell.innerHTML = "Original notes";
+	row.appendChild(cell);
+
+	cell = document.createElement("TD");
+	cell.innerHTML = "Additional notes";
+	row.appendChild(cell);
+
+	tblNouns.appendChild(row);
+
+	for (var v = 0; v < dictio.nouns.length; v++) {
+		row = document.createElement("TR");
+		cell = document.createElement("TD");
+		cell.innerHTML = dictio.nouns[v].number
+		row.appendChild(cell);
+
+		cell = document.createElement("TD");
+		cell.innerHTML = dictio.nouns[v].description
+		row.appendChild(cell);
+
+		cell = document.createElement("TD");
+		cell.innerHTML = dictio.nouns[v].components
+		row.appendChild(cell);
+
+		cell = document.createElement("TD");
+		cell.innerHTML = dictio.nouns[v].scale
+		row.appendChild(cell);
+
+		cell = document.createElement("TD");
+		cell.innerHTML = dictio.nouns[v].notes_org
+		row.appendChild(cell);
+
+		cell = document.createElement("TD");
+		cell.innerHTML = dictio.nouns[v].notes
+		row.appendChild(cell);
+
+		tblNouns.appendChild(row);
+	}
+    document.getElementById("reftab").appendChild(tblNouns);
+}
+   //-->
+  </SCRIPT>
+</head>
+
+<body text="#FFFFFF" bgcolor="#000000" >
+
+<script>
+nextimage1 = new Image ();
+nextimage1 . src = "digit-off.jpg";
+nextimage2 = new Image ();
+nextimage2 . src = "digit0.jpg";
+nextimage3 = new Image ();
+nextimage3 . src = "digit1.jpg";
+nextimage4 = new Image ();
+nextimage4 . src = "digit2.jpg";
+nextimage5 = new Image ();
+nextimage5 . src = "digit3.jpg";
+nextimage6 = new Image ();
+nextimage6 . src = "digit4.jpg";
+nextimage7 = new Image ();
+nextimage7 . src = "digit5.jpg";
+nextimage8 = new Image ();
+nextimage8 . src = "digit6.jpg";
+nextimage9 = new Image ();
+nextimage9 . src = "digit7.jpg";
+nextimage10 = new Image ();
+nextimage10 . src = "digit8.jpg";
+nextimage11 = new Image ();
+nextimage11 . src = "digit9.jpg";
+nextimage12 = new Image ();
+nextimage12 . src = "plusmin-min.jpg";
+nextimage13 = new Image ();
+nextimage13 . src = "plusmin-plus.jpg";
+nextimage14 = new Image ();
+nextimage14 . src = "dsky-compacty-on.jpg";
+</script>
+
+
+
+<span id=ElDSKY>
+<table cellspacing=0 cellpadding=0 border=0 bgcolor="#000000">
+<tr>
+<td colspan=3><img src="dsky-top.jpg" alt=""></td>
+</tr>
+<tr>
+<td >
+
+<canvas id="cnvContainer" name="cnvContainer"  width=180  height=194 ></canvas>
+
+
+
+</td>
+<td><table cellspacing=0 cellpadding=0 border=0 bgcolor="#000000">
+<tr>
+<td colspan=3 rowspan=2><img src="dsky-compacty-off.jpg" alt="" NAME="COMPACTY" height=48 width=49></td>
+<td rowspan=4 valign=top><img src="dsky-leftPN.jpg" width="29" height="93" alt=""></td>
+<td><img src="dsky-prog.jpg" alt=""></td>
+</tr>
+
+<tr>
+<td><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="P1"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="P2"></td>
+</tr>
+<tr>
+<td colspan=3><img src="dsky-verb.jpg" alt=""></td>
+<td valign=top><img src="dsky-noun.jpg" alt=""></td>
+</tr>
+
+<tr>
+<td rowspan=7><img src="dsky-leftV.jpg" width="10" height="124" alt=""></td>
+<td><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="V1"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="V2"></td>
+<td><img src="spacer.gif" width=7 height=23 alt=""></td>
+<td><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="N1"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="N2"></td>
+</tr>
+
+<tr>
+<td colspan=4><img src="dsky-line1.jpg" width="100" height="10" alt=""></td>
+</tr>
+
+<tr>
+<td colspan=4><img src="plusmin-off.jpg" width="16" height="23" alt="" border="0" name="R1PM"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R1D1"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R1D2"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R1D3"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R1D4"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R1D5"></td>
+</tr>
+
+<tr>
+<td colspan=4><img src="dsky-line2.jpg" width="100" height="11" alt=""></td>
+</tr>
+
+<tr>
+<td colspan=4><img src="plusmin-off.jpg" width="16" height="23" alt="" border="0" name="R2PM"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R2D1"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R2D2"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R2D3"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R2D4"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R2D5"></td>
+</tr>
+
+<tr>
+<td colspan=4><img src="dsky-line3.jpg" width="100" height="11" alt=""></td>
+</tr>
+
+<tr>
+<td colspan=4><img src="plusmin-off.jpg" width="16" height="23" alt="" border="0" name="R3PM"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R3D1"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R3D2"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R3D3"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R3D4"><img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="R3D5"></td>
+</tr>
+
+</table></td>
+<td><img src="dsky-rightPN.jpg" alt=""></td>
+</tr>
+
+<tr>
+<map NAME="DSKYMAP">
+<area SHAPE="RECT" COORDS="11,42,51,82"  HREF="javascript:PressedKey(10);">
+<area SHAPE="RECT" COORDS="11,85,51,125"  HREF="javascript:PressedKey(11);">
+
+<area SHAPE="RECT" COORDS="54,21,94,61"     HREF="javascript:PressedKey(20);">
+<area SHAPE="RECT" COORDS="54,62,94,102"    HREF="javascript:PressedKey(21);">
+<area SHAPE="RECT" COORDS="54,106,94,146"  HREF="javascript:PressedKey(0);">
+
+<area SHAPE="RECT" COORDS="97,21,137,61"  HREF="javascript:PressedKey(7);">
+<area SHAPE="RECT" COORDS="97,62,137,102"  HREF="javascript:PressedKey(4);">
+<area SHAPE="RECT" COORDS="97,106,137,146"  HREF="javascript:PressedKey(1);">
+
+<area SHAPE="RECT" COORDS="140,21,180,61"  HREF="javascript:PressedKey(8);">
+<area SHAPE="RECT" COORDS="140,62,180,102"  HREF="javascript:PressedKey(5);">
+<area SHAPE="RECT" COORDS="140,106,180,146"  HREF="javascript:PressedKey(2);">
+
+<area SHAPE="RECT" COORDS="186,21,226,61"  HREF="javascript:PressedKey(9);">
+<area SHAPE="RECT" COORDS="186,62,226,102"  HREF="javascript:PressedKey(6);">
+<area SHAPE="RECT" COORDS="186,106,226,146"  HREF="javascript:PressedKey(3);">
+
+<area SHAPE="RECT" COORDS="229,21,269,61"  HREF="javascript:PressedKey(23);">
+<area SHAPE="RECT" COORDS="229,62,269,102"  HREF="javascript:PressedKey(13);">
+<area SHAPE="RECT" COORDS="229,106,269,146"  HREF="javascript:PressedKey(22);">
+
+<area SHAPE="RECT" COORDS="271,42,311,82"  HREF="javascript:PressedKey(12);">
+<area SHAPE="RECT" COORDS="271,85,311,125"  HREF="javascript:PressedKey(24);">
+</map>
+<td colspan=3><img src="dsky-keypad.jpg" alt="" usemap="#DSKYMAP" border="0"></td>
+</tr>
+
+</table>
+
+<br>
+MISSION TIME:
+<img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="MT1">
+<img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="MT2">
+<img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="MT3">h
+
+<img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="MT4">
+<img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="MT5">m
+
+<img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="MT6">
+<img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="MT7">
+<br>
+
+MISSION TIME:
+<img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="MT1b">
+<img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="MT2b">
+<img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="MT3b">
+<img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="MT4b">
+<img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="MT5b">
+<img src="digit-off.jpg" width="16" height="23" alt="" border="0" name="MT6b">
+<br>
+<br><br>
+Verb: <span id="spnVerbExplain" name="spnVerbExplain"> - </span><br>
+Noun: <span id="spnNounExplain" name="spnNounExplain"> - </span><br>
+Prog: <span id="spnProgExplain" name="spnProgExplain"> - </span><br>
+<br>
+Reference table:<br>
+<span id="reftab" name="reftab">-</span><br>
+
+</span>
+
+
+
+
+<img src="dsky-lights.jpg" id = "keys" name="keys" hidden=true>
+
+<img src="uplink-on.png" 	id = "uplink1" 	name="uplink1" hidden=true>
+<img src="temp-on.png" 		id = "temp1" 	name="temp1" hidden=true>
+<img src="alt-on.png" 		id = "alt1" 	name="alt2" hidden=true>
+<img src="vel-on.png" 		id = "vel1"		name="vel2" hidden=true>
+<img src="stby-on.png" 		id = "stby1" 	name="stby1" hidden=true>
+<img src="prog-on.png" 		id = "prog1" 	name="prog1" hidden=true>
+<img src="tracker-on.png" 	id = "tracker1" name="tracker1" hidden=true>
+<img src="oprerr-on.png" 	id = "oprerr1" 	name="oprerr1" hidden=true>
+<img src="noatt-on.png" 	id = "noatt1" 	name="noatt1" hidden=true>
+<img src="gimbal-on.png" 	id = "gimbal1" 	name="gimbal1" hidden=true>
+<img src="keyrel-on.png" 	id = "keyrel1" 	name="keyrel1" hidden=true>
+<img src="restart-on.png"	 id = "restart1"	name="restart1" hidden=true>
+
+
+<img src="uplink-off.png" 	id = "uplink0" 	name="uplink0" hidden=true>
+<img src="temp-off.png" 	id = "temp0" 	name="temp0" hidden=true>
+<img src="alt-off.png"		id = "alt0" 	name="alt0" hidden=true>
+<img src="vel-off.png" 		id = "vel0" 	name="vel0" hidden=true>
+<img src="stby-off.png" 	id = "stby0" 	name="stby0" hidden=true>
+<img src="prog-off.png" 	id = "prog0" 	name="prog0" hidden=true>
+<img src="tracker-off.png" 	id = "tracker0"	name="tracker0" hidden=true>
+<img src="oprerr-off.png" 	id = "oprerr0" 	name="oprerr0" hidden=true>
+<img src="noatt-off.png" 	id = "noatt0" 	name="noatt0" hidden=true>
+<img src="gimbal-off.png" 	id = "gimbal0" 	name="gimbal0" hidden=true>
+<img src="keyrel-off.png" 	id = "keyrel0" 	name="keyrel0" hidden=true>
+<img src="restart-off.png" 	id = "restart0"	name="restart0" hidden=true>
+
+
+
+<SCRIPT LANGUAGE="JavaScript">
+
+XLEFT = 32;
+XRIGHT = 86;
+YSTART = 9;
+YSTEP = 25;
+XPOS = [XLEFT, XRIGHT];
+
+LAMPS = [
+			[
+				 {
+				 	id: "uplink",
+					pos : "left",
+					flagword: null,
+					channel: {index: 11, bit: 2},
+					other: null // daptab, imodes,...
+				},
+				 {
+				 	id: "temp",
+					pos : "right",
+					flagword: null,
+					channel: {index: 11, bit: 4},
+					other: null // daptab, imodes,...
+				},
+			],
+
+			[
+				 {
+				 	id: "gimbal",
+					pos : "left",
+					flagword: null,
+					channel: null,
+					other: {name: "daptab11d", bit : 6}
+				 },
+				 {
+				 	id: "noatt",
+					pos : "right",
+					flagword: null,
+					channel: null,
+					other: {name: "daptab11d", bit : 4} 
+				},
+			],
+
+
+			[
+				 {
+				 	id: "stby",
+					pos : "left",
+					flagword: null,
+					channel: {index: 13, bit: 11},
+					other: null // daptab, imodes,...
+				},
+				 {
+				 	id: "prog",
+					pos : "right",
+					flagword: null,
+					channel: null,
+					other: {name: "daptab11d", bit : 9} 
+				},
+			],
+
+
+			[
+				 {
+				 	id: "keyrel",
+					pos : "left",
+					flagword: null,
+					channel: {index: 11, bit: 5},
+					other: null // daptab, imodes,...
+				},
+				 {
+				 	id: "restart",
+					pos : "right",
+					flagword: null,
+					channel: null,
+					other: null // daptab, imodes,...
+				},
+			],
+
+
+			[
+				 {
+				 	id: "oprerr",
+					pos : "left",
+					flagword: null,
+					channel: {index: 11, bit: 7},
+					other: null // daptab, imodes,...
+				},
+				 {
+				 	id: "tracker",
+					pos : "right",
+					flagword: null,
+					channel: null,
+					other: {name: "daptab11d", bit : 8}
+				},
+			],
+
+
+			[
+				 {
+				 	id: null,
+					pos : "left",
+				},
+				 {
+				 	id: "alt",
+					pos : "right",
+					flagword:  {index: 11, bit: 1},
+					channel: null,
+					other: null // daptab, imodes,...
+				},
+			],
+
+
+			[
+				 {
+				 	id: null,
+					pos : "left",
+				},
+				 {
+				 	id: "vel",
+					pos : "right",
+					flagword:  {index: 11, bit: 2},
+					channel: null,
+					other: null // daptab, imodes,...
+				},
+			]
+]
+
+
+
+	function initPage() {
+		StartTime();
+		ShowVNP(1);
+		ShowVNP(2);
+		ShowVNP(3);
+		HideReg(1);
+		HideReg(2);
+		HideReg(3);
+		fillTableVerbs();
+		fillTableNouns();
+
+console.log(flagwords);
+console.log(channels);
+
+		canvas = document.getElementById("cnvContainer");
+		context = canvas.getContext('2d');
+
+		context.drawImage(keys, 0, 0,180,200); // Just to draw borders; lamps are redrawn below:
+
+        testLampsOn();
+		setTimeout(() => {  testLampsOff() }, 500);
+		//testLampsOn();
+		//testLampsOff();
+	}
+
+
+
+	function testLampsOn() {
+console.log("on");
+		var row = -1;
+		LAMPS.forEach(element => {
+			row++;
+			column = -1;
+			element.forEach(lamp => {
+				column++;
+				turnLampOnOff(lamp.id, "1");
+			}
+			)
+		});
+	}
+
+
+
+	function testLampsOff() {
+console.log("off");
+		var row = -1;
+		LAMPS.forEach(element => {
+			row++;
+			column = -1;
+			element.forEach(lamp => {
+				column++;
+				turnLampOnOff(lamp.id, "0");
+			}
+			)
+		});
+	}
+
+
+
+	function turnLampOnOff(lampId, status) {
+	if (status === "*") return;
+		var row = -1;
+		status += "";
+		LAMPS.forEach(element => {
+			row++;
+			column = -1;
+			element.forEach(lamp => {
+				column++;
+				if (lamp.id == lampId) {
+
+					lampItem = lampId + status;
+					if (LAMPS[row][column].id != null) {
+						context.drawImage(document.getElementById(lampItem), XPOS[column], YSTART + YSTEP * row);
+					}
+
+				}
+			}
+			)
+		});
+	}
+
+
+
+function updateMissionTime(sec) {
+	var seconds = Math.floor((sec) % 60),
+		minutes = Math.floor((sec / (60)) % 60),
+		hours = Math.floor((sec / (60 * 60)) % 24);
+		days = Math.floor((sec / (24 * 60 * 60)) % 24);
+
+	days = (hours < 10) ? "0" + days : days;
+	hours = (hours < 10) ? "0" + hours : hours;
+	minutes = (minutes < 10) ? "0" + minutes : minutes;
+	seconds = (seconds < 10) ? "0" + seconds : seconds;
+
+//console.log(sec, days*1, hours*1, minutes*1, seconds*1);
+    writeMissionTimeDigits("h", days*24 + hours*1);
+    writeMissionTimeDigits("m",minutes*1);
+    writeMissionTimeDigits("s",seconds*1);
+    writeMissionTimeDigitsSeconds(days * 86400 + hours * 3600 + minutes * 60 + seconds);
+
+}
+
+
+function writeMissionTimeDigits(pos,val) {
+	// Add zeroes as needed:
+	val = (val < 100) ? "0" + val: val;
+	val = (val < 10) ? "0" + val: val;
+	val += ""; // turn into srtring
+
+	// Extract digits
+	d1 = val.substr(0,1);
+	d2 = val.substr(1,1);
+	d3 = val.substr(2,1);
+
+	// Display digits
+	switch (pos) {
+		case "h":
+			DisplayDigit(d1,"MT1");
+			DisplayDigit(d2,"MT2");
+			DisplayDigit(d3,"MT3");
+			break;
+		case "m":
+			DisplayDigit(d2,"MT4");
+			DisplayDigit(d3,"MT5");
+			break;
+		case "s":
+			DisplayDigit(d2,"MT6");
+			DisplayDigit(d3,"MT7");
+			break;
+	}
+}
+
+
+
+function writeMissionTimeDigitsSeconds(val) {
+
+	val += "";
+
+	d1 = val.substr(0,1);
+	d2 = val.substr(1,1);
+	d3 = val.substr(2,1);
+	d4 = val.substr(3,1);
+	d5 = val.substr(4,1);
+	d6 = val.substr(5,1);
+
+	DisplayDigit(d1,"MT1b");
+	DisplayDigit(d2,"MT2b");
+	DisplayDigit(d3,"MT3b");
+	DisplayDigit(d4,"MT4b");
+	DisplayDigit(d5,"MT5b");
+	DisplayDigit(d6,"MT6b");
+}
+
+function toMissionTime(JSdate) {
+if (JSdate == null) 
+  return {
+  	"dayshours" : 0 + "d " + 0 + "h " + 0 + "m " + 0 + "s " + 00 + "ms",
+  	"dayshours2" : 0 + ":" + 0 + ":" + 0 + ":" + 0 + "." + 00,
+	"hours" : (0*24 + 0*1) + ":" + 0 + ":" + 0 + "." + 00,
+	"seconds" : 0*86400 + 0*3600 + 0*60 + 0 + 00,
+	"milliseconds" : 0*86400000 + 0*3600000 + 0*60000 + 0*1000 + 00
+  }
+
+	ms = JSdate.getTime();
+	msMT = ms - LIFTOFF_TIME.getTime();
+
+  var milliseconds = parseInt((msMT % 1000) / 100),
+    seconds = Math.floor((msMT / 1000) % 60),
+    minutes = Math.floor((msMT / (1000 * 60)) % 60),
+    hours = Math.floor((msMT / (1000 * 60 * 60)) % 24);
+    days = Math.floor((msMT / (24 * 1000 * 60 * 60)) % 24);
+
+  days = (hours < 10) ? "0" + days : days;
+  hours = (hours < 10) ? "0" + hours : hours;
+  minutes = (minutes < 10) ? "0" + minutes : minutes;
+  seconds = (seconds < 10) ? "0" + seconds : seconds;
+
+  return {
+  	"dayshours" : days + "d " + hours + "h " + minutes + "m " + seconds + "s " + milliseconds + "ms",
+  	"dayshours2" : days + ":" + hours + ":" + minutes + ":" + seconds + "." + milliseconds,
+	"hours" : (days*24 + hours*1) + ":" + minutes + ":" + seconds + "." + milliseconds,
+	"seconds" : days*86400 + hours*3600 + minutes*60 + seconds + milliseconds,
+	"milliseconds" : days*86400000 + hours*3600000 + minutes*60000 + seconds*1000 + milliseconds
+  }
+
+    }
+
+
+document.addEventListener("DOMContentLoaded", initPage());
+</script>
+
+
+</body>
+</html>
