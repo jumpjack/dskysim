@@ -18,14 +18,15 @@ It's dated 2001, more than 20 years ago; probably github didn't even exist at th
 
 Original functionalities are indeed very simple, and summarized in the short help in the page itself, which you can find [here](https://github.com/jumpjack/dskysim/wiki/Original-help).
 
-But the exposed methods allow to easily interface the DSKY to any external javascript source, so I plan to write an "Apollo 11 LEM descent AGC replayer", which will replay status of lamps and registers of DSKY as recorded on july, 20th, 1969. 
+# Original Apollo 11 telemetries of descent
 
-Telemetries are available [here](http://www.ibiblio.org/apollo/Documents/apollo_11_computer_words.pdf).
-
-I am trying to decode them [here](https://github.com/jumpjack/dskysim/wiki/Decoding-AGC-telemetries).
+Telemetries of Lunar Module 5 of Apollo 11 mission are available [here](http://www.ibiblio.org/apollo/Documents/apollo_11_computer_words.pdf); I am trying to decode them [here](https://github.com/jumpjack/dskysim/wiki/Decoding-AGC-telemetries).
 
 High resolution scans of single pages are available [here](https://ia902308.us.archive.org/view_archive.php?archive=/27/items/apollo_11_computer_words/apollo_11_computer_words_jp2.zip).
 
+# Exposed methods of DSKYSIM
+
+But the exposed methods allow to easily interface the DSKY to any external javascript source, so I plan to write an "Apollo 11 LEM descent AGC replayer", which will replay status of lamps and registers of DSKY as recorded on july, 20th, 1969.
 
 I list in [this page](https://github.com/jumpjack/dskysim/wiki/Dskysim-methods) the highest level methods available to the developer; this is all you need to know to attach this interface to your program.
 
@@ -57,6 +58,6 @@ My repository [Apollo11LEMdata](https://github.com/jumpjack/Apollo11LEMdata), de
 
 # Other javascript AGC/DSKY simulators
 - [Moonjs](https://svtsim.com/moonjs/agc.html)
-- [iDSKY](http://idsky.genedorr.com/iDSKY.html)
+- [iDSKY](http://idsky.genedorr.com/iDSKY.html) (Exposed methods of iDSKY: here)
 
 (*) "OUTPUT - EVERY 2 SECONDS 100 DOUBLE PRECISION WORDS (I.E. 200 LGC COMPUTER WORDS) ARE TRANSMITTED VIA DOWNLINK" --> see [original AGC source](https://github.com/virtualagc/virtualagc/blob/a9f2fd2d4c313497bbf98e80a0cbef0dc87faf09/LMY99R0/DOWN-TELEMETRY_PROGRAM.agc#L109)
